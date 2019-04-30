@@ -19,7 +19,11 @@ model <- function(time, stocks, auxs){
     aTotalMVPA <- aActiveTransport + aWorkMVPA + aPHLTPA*aRRPACampaign
     aTotalMETs <- aTotalMVPA*aMETsMVPA
     aDailyCalBurned <- (aTotalMETs*3.5*aAvgBodyWt)/200
-   
+    
+    #SSB calories
+    aEffectSSBPriceChange <- (aElasticity.SSB + aEffectSSB.Campaign + aEffectSSB.Counter)*aSSBPriceChange
+    aAvgSSBConsumption <- aSSB.init + (aEffectSSBPriceChange/100)
+    aCaloriesSSB <- aAvgSSBConsumption*aSSBperUnitCal
      #Food calories
   
     #inflow of Fruit and Vegetable production
@@ -35,7 +39,8 @@ model <- function(time, stocks, auxs){
     
     aEffectFVPrice <- aPriceChangeFV * aElasFVPrice
     aEffectUHPrice <- aPriceChangeUH * aUHFVCrossPrice
-   
+    
+    
      #outflow of fruit and veg consumption in kg/capita/yr
     fFVConsumption <- aInitFVIntake + (aInitFVIntake * aEffectFVPrice/100) + 
       (aInitFVIntake*aEffectUHPrice) + ((aEffectFVPH/1000)*365)
@@ -88,7 +93,8 @@ model <- function(time, stocks, auxs){
     aDMinNonObese <- (100-aObesefractIGT/100)*sNGT*(aDMincidenceNO/100)
     aDMinObese <- (aObesefractIGT/100)*sIGT*(aDMincidenceNO/100)*aRRofDMinObese
     aDMOnsetObesity <- aDMinObese + aDMinNonObese
-    aDMOnsetSSB <- aDMOnsetObesity*ff(TotalPAHrs)
+    aDMOnsetPA<- aDMOnsetObesity*ff(aTotalMVPA)
+    aDMOnsetSSB <- aDMOnsetPA*aRRofSSBs*aAvgSSBConsumption #Confirm structure against SYSDEA
     aDMOnsetAging <- ((aFractOver65/100)*aRRofDMinElderly*aDMOnsetSSB) +
       ((100-aFractOver65/100)*aDMOnsetSSB)
     fDMOnset <- aDMOnsetAging

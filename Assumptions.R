@@ -38,7 +38,15 @@ aAvgHeight <- 1.69
 aInitAvgWt <- 62.8 #in kg
 aFatFrac <- 0.3
 aFracCalDigestion <- 0.1
-
+#SSB Calories
+aRRofSSBs <- 1.13 #13% increase in risk per unit consumed per day
+aSSB.init <- 3 #average units consumed per day
+aSSBperUnitCal <- 130
+aElasticity.SSB <- -1.3
+aEffectSSB.Campaign <- -0.5#NEED EVIDENCE FOR THIS FIGURE
+aEffectSSB.Counter <- 2#NEED EVIDENCE FOR THIS FIGURE
+aSSBPriceChange <- 10#percentage that should be input by the model
+#Food Calories
 aOtherIntake <- 2000
 
 UHCalories <- c(200,200, 211, 233, 244, 278, 311, 333,
