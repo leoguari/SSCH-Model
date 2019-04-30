@@ -17,22 +17,25 @@ server <- function(input, output) {
     simtime <- seq(START, FINISH, by=STEP)
     
     # Create stock and auxs
-    stocks  <- c(sNGT=1200,
-                 sIGT=102,
-                 sDM=52.8)
+    
+    stocks  <- c(sNGT=Baseline.NGT,
+                 sIGT=Baseline.IGT,
+                 sDM=Baseline.DM)
     
     auxs    <- c(aAdultPopGrowth = 200, 
-                 aMortalityNGTrate = input$obs, ## 7.6, --
-                 aIGTincidenceNO = 1.2, ## percentage from NGT
-                 aDMincidenceNO = input$obs2, ## 7, ## percentage from IGT --
-                 aIGTrecovery = 10, ## percentage
+                 aMortalityNGTrate = 7.6, ## per 1000 adults
+                 aIGTincidenceNO = 1.2, ## baseline incidence rate of IGT in people without obesity as %
+                 aDMincidenceNO = input$incDM, ## 7, ## percentage from IGT --
+                 aIGTrecovery = 10, ## rate of recovery from IGT to NGT, percentage
                  aRRofIGTinObese = 1.5,
                  aRRofDMinObese = 9.9,
-                 aRRofMortalityDM = 1.8,
-                 aRRofDMElderly= 1.5,
+                 aRRofMortalityDM.Under50 = 3.5,
+                 aRRofMortalityDM.Over50 = 1.5,
+                 aFractOver50=over.50, # curve taken from assumptions, UNPoP
+                 aRRofDMElderly= 1.5, #Over 65
                  aObesefractNGT=20, ## percentage
                  aObesefractIGT=60, ## percentage
-                 aElderlyfract=30) ## percentage
+                 aFractOver65=over.65) ## curve taken from assumptions, UNPoP Div
     
     o<-data.frame(ode(y=stocks, times=simtime, func = model, 
                       parms=auxs, method='euler'))
@@ -47,8 +50,8 @@ ui <- fluidPage(
   sidebarLayout(
     sidebarPanel(
       radioButtons(inputId = "DM_options", label = "Select Diabetes Disease Measures:", choices = dm_options),
-      sliderInput("obs", "Incidence in 1000s:", min = 1, max = 100, value = 10),
-      sliderInput("obs2", "All-cause mortality in 1000s:", min = 1, max = 100, value = 20)
+      sliderInput("incDM", "Incidence in 1000s:", min = 1, max = 100, value = 10),
+      sliderInput("mort", "All-cause mortality in 1000s:", min = 1, max = 100, value = 20)
     ),
     mainPanel(plotOutput("distPlot"))
   )
