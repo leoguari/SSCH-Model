@@ -7,6 +7,9 @@ PaRRs <- c(1, 0.99, 0.93, 0.87, 0.76, 0.74, 0.64, 0.47)
 PAHrs <- c(0,1, 2, 4, 10, 11, 22, 60)
 ff <- approxfun(PAHrs, PaRRs)
 
+#IGT recovery rate
+aIGTRecovery <- 10
+
 #Assuming a baseline share of prev of DM in adults 2%, IGT 5%, 97% NGT
 Baseline.Pop <- 1200 #in 1000s so 1.2 million is baseline
 Baseline.NGT <- .93*Baseline.Pop

@@ -48,7 +48,7 @@ model <- function(time, stocks, auxs){
     aFVkcalperday <- aCalperFV*(fFVConsumption/365)*1000
     aEffectUHTax <- aPriceChangeUH * aElasUHFoods
     aUHFoods <- aUHCalories + (aUHCalories*aEffectUHTax/100) - (aUHCalories*aEffectUHPH/100)
-    aDailyIntake <- aUHFoods + aFVIntake + aOtherIntake
+    aDailyIntake <- aUHFoods + aFVIntake + aOtherIntake + aCaloriesSSB
     
     #Fruit and vegetable stock equation
     sFV_dt <-  fFVProduction - fFVWaste - fFVExport - fFVConsumption
@@ -127,5 +127,5 @@ model <- function(time, stocks, auxs){
   })
 }
 # Plot results
-##qplot(x=time,y=sDM,data=o) + geom_line()
+#qplot(x=time,y=sDM,data=o) + geom_line()
 
