@@ -20,23 +20,72 @@ server <- function(input, output) {
     
     stocks  <- c(sNGT=Baseline.NGT,
                  sIGT=Baseline.IGT,
-                 sDM=Baseline.DM)
+                 sDM=Baseline.DM,
+                 sAvgBdWt=aInitAvgWt,
+                 sFV=aInitFVStock) #add obesity stock
     
-    auxs    <- c(aAdultPopGrowth = 200, 
-                 aMortalityNGTrate = 7.6, ## per 1000 adults
-                 aIGTincidenceNO = 1.2, ## baseline incidence rate of IGT in people without obesity as %
-                 aDMincidenceNO = input$incDM, ## 7, ## percentage from IGT --
-                 aIGTrecovery = 10, ## rate of recovery from IGT to NGT, percentage
-                 aRRofIGTinObese = 1.5,
-                 aRRofDMinObese = 9.9,
-                 aRRofMortalityDM.Under50 = 3.5,
-                 aRRofMortalityDM.Over50 = 1.5,
-                 aFractOver50=over.50, # curve taken from assumptions, UNPoP
-                 aRRofDMElderly= 1.5, #Over 65
-                 aObesefractNGT=20, ## percentage
-                 aObesefractIGT=60, ## percentage
-                 aFractOver65=over.65) ## curve taken from assumptions, UNPoP Div
-    
+    auxs    <- c(aEffectSSBPriceChange=10, #SSB calories
+                 aElasticity.SSB=-1.3,
+                 aEffectSSB.Campaign=-0.5,
+                 aEffectSSB.Counter=2,
+                 aSSBPriceChange=10,
+                 aAvgSSBConsumption=3.02,
+                 aSSBperUnitCal=140,
+                 
+                 #Fruits and Vegetables
+                 aInitialFVProduction=ffInitialFVProduction(years.all),
+                 aTotalPopulation=ffTotalPopulation(years.all),
+                 aIncreaseinFV=10,
+                 aTotalkgImports=ffTotalkgImports(years.all),
+                 aImportsTourism=60,
+                 aLocalTourism=15,
+                 aFVExport=ffFVExport(years.all),
+                 aPriceChangeFV=0,
+                 aElasFVPrice=1.65,
+                 aPriceChangeUH=20,
+                 aUHFVCrossPrice=0.07,
+                 aInitFVIntake=40,
+                 aEffectFVPH=6.2,
+                 aCalperFV=1,
+                 aElasUHFoods=0.725,
+                 aUHCalories=ffUHCalories(years.all),
+                 aEffectUHPH=10,
+                 aOtherintake=2000, #this needs to be updated to a curve
+                 
+                 #Physical activity
+                 aFraction.Bus.Use=75, # this needs to be a curve
+                 aElasticity.Bus.Fare=0.15,
+                 aChange.in.Bus.Fare=0,
+                 aWork.init=200,
+                 aWork.decline=0.03,
+                 aTravel.init=60,
+                 aTravel.decline=0.017,
+                 aLT.init=15,
+                 aLT.change=0.019,
+                 aEffectInfra=0.05,
+                 aRRPACampaign=0.05,
+                 aMETsMVPA=4.0,
+                 
+                 #Obesity
+                 aFatFrac=0.3,
+                 aFracCalDigestion=0.1,
+                 aAvgHeight=1.69,
+                 
+                 #Core model
+                 aTotal.pop=Total.pop(years.all),
+                 aMortalityNGTrate=7.6,
+                 aIGTincidenceNO=1.2,
+                 aRRofIGTinObese=1.5,
+                 aIGTrecovery=10,
+                 aDMincidenceNO=7,
+                 aRRofDMinObese=9.9,
+                 aRRofSSBs=1.13,
+                 aFractOver65=over.65(years.all),
+                 aRRofDMinElderly=1.5,
+                 Fract.Over50=over.50(years.all),
+                 aRRofMoratlityDM.Over50=1.5,
+                 aRRofMortalityDM.Under50=3.5             
+    )
     o<-data.frame(ode(y=stocks, times=simtime, func = model, 
                       parms=auxs, method='euler'))
     

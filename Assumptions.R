@@ -18,10 +18,9 @@ Baseline.DM <- .02*Baseline.Pop
 
 #Estimating population inflow, number of adults added
 # in 1000s
-people <-c(1000,1130, 1000, 990, 1190, 1390, 1120,
+people <-c(1000, 1130, 1000, 990, 1190, 1390, 1120,
            580, 360, 170, 370, 140, -140)
 Total.pop <- approxfun(years, people)
-
 # fraction of population of 65 - for use in RR of mortality
 Fract.Over65 <- c(.14, .13, .14, .13, .13, .14, .15, .16, .19, .21, .23, 
                   .25, .27)
@@ -30,6 +29,7 @@ Fract.Over50 <- c(29.22, 28.23, 28.68, 30.40, 31.90, 34.03, 36.16,
                   38.62, 41.09, 44.31, 47.59, 51.08, 54.48)
 over.50 <- approxfun(years, Fract.Over50)
 
+aMortalityNGTrate <- 7.6 # per 1000 in adults from WHO mortality DB
 
 ##Estimating obesity prevalence from average population BMI
 BMI <- c(20:35)
@@ -41,6 +41,7 @@ aAvgHeight <- 1.69
 aInitAvgWt <- 62.8 #in kg
 aFatFrac <- 0.3
 aFracCalDigestion <- 0.1
+
 #SSB Calories
 aRRofSSBs <- 1.13 #13% increase in risk per unit consumed per day
 aSSB.init <- 3 #average units consumed per day
@@ -54,7 +55,7 @@ aOtherIntake <- 2000
 
 UHCalories <- c(200,200, 211, 233, 244, 278, 311, 333,
                  356, 356, 356, 367, 378)
-aUHCalories <- approxfun(years, UHCalories)
+ffUHCalories <- approxfun(years, UHCalories)
 aElasUHFoods <- 0.725
 aPriceChangeUH <- 20 #percentage
 aEffectUHPH <- 10 #percentage
@@ -64,6 +65,7 @@ aEffectFVPH <- 6.2 #grams per day increase consumption FV
 aUHFVCrossPrice <- 0.07 #cross price elasticity from UH foods to FV
 aPriceChangeFV <- 10 #percentage
 aElasFVPrice <- 1.65 #assuming a price decrease
+aInitFVStock <- 250 #in kg per capita
 FVExport.full <- c(14000000, 14387875, 17329309, 18232364, 18250000,
                18250000, 18289920, 15154392, 16252016, 17176887,
                12402018, 15042028, 13400867, 15645654, 13753094,
@@ -77,8 +79,9 @@ FVExport.full <- c(14000000, 14387875, 17329309, 18232364, 18250000,
                17086806, 17309028, 17309028, 17309028, 17531250,
                17531250, 17531250, 17531250, 17531250, 17531250,
                17753472)
-aFVExport <- approxfun(years.all, FVExport.full)
-aTotalPopulation <- 2800000 #NEED TO UPDATE THIS TO A YEARLY DISTRIBUTION
+ffFVExport <- approxfun(years.all, FVExport.full)
+Total.Pop.All.Ages <- c(2424, 2537, 2657, 2745, 2817, 2872, 2913, 2934, 2933, 2908, 2858, 2789, 2704) #WPP 2017
+ffTotalPopulation <- approxfun(years, Total.Pop.All.Ages)
 aImportsTourism <- 60 #percentage
 aLocalTourism <- 15 #percentage
 TotalkgImports.full <- c(2500000, 2897861, 2709680, 6395833, 7729167,
@@ -94,7 +97,7 @@ TotalkgImports.full <- c(2500000, 2897861, 2709680, 6395833, 7729167,
                      19729167, 19729167, 19729167, 19729167, 19729167,
                      19729167, 19729167, 19729167, 19729167, 19729167,
                      19729167)
-aTotalkgImports <- approxfun(years.all, TotalkgImports.full)
+ffTotalkgImports <- approxfun(years.all, TotalkgImports.full)
 aIncreaseinFV <- 10 #percentage
 
 InitialFVProduction.Full <- c(503976, 511753, 511753, 519531, 527309, 542865,
@@ -108,7 +111,7 @@ InitialFVProduction.Full <- c(503976, 511753, 511753, 519531, 527309, 542865,
                           690642, 690642, 690642, 690642, 690642, 690642,
                           690642, 690642, 690642, 690642, 690642, 690642,
                           690642)
-aInitialFVProduction <- approxfun(years.all, InitialFVProduction.Full)
+ffInitialFVProduction <- approxfun(years.all, InitialFVProduction.Full)
 
 # Physical activity
 aMETsMVPA <- 4.0 # average METS for MVPA
@@ -120,7 +123,9 @@ aLT.init  <- 15
 aLT.change <- .019
 Bus.Minutes.Function <- c(0.25, 0.5, 1.00, 2, 5, 7, 10)
 bus.years <- c(1990, 2000, 2010, 2020, 2030, 2040, 2050)
-aBusMinutes.calc <- approxfun(bus.years, Bus.Minutes.Function)
+ffBusMinutes.calc <- approxfun(bus.years, Bus.Minutes.Function)
 aFraction.Bus.Use <- 75 # needs to be a curve. Right now only latest data
 aElasticity.Bus.Fare <- 0.15
 aChange.in.Bus.Fare <- 10
+aEffectInfra <- 0.05
+aRRPACampaign <- 0.05
