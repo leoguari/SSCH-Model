@@ -22,24 +22,21 @@ server <- function(input, output) {
                  sIGT=Baseline.IGT,
                  sDM=Baseline.DM,
                  sAvgBdWt=aInitAvgWt,
-                 sFV=aInitFVStock) #add obesity stock
+                 sFV=aInitFVStock) 
     
-    auxs    <- c(aEffectSSBPriceChange=10, #SSB calories
+    auxs    <- c(aEffectSSBPriceChange=0, #SSB calories
                  aElasticity.SSB=-1.3,
                  aEffectSSB.Campaign=-0.5,
                  aEffectSSB.Counter=2,
                  aSSBPriceChange=10,
                  aAvgSSBConsumption=3.02,
                  aSSBperUnitCal=140,
+                 aSSB.init=3.1, #change this to a distribution
                  
                  #Fruits and Vegetables
-                 aInitialFVProduction=ffInitialFVProduction(years.all),
-                 aTotalPopulation=ffTotalPopulation(years.all),
-                 aIncreaseinFV=10,
-                 aTotalkgImports=ffTotalkgImports(years.all),
+                 aIncreaseinFV=0,
                  aImportsTourism=60,
                  aLocalTourism=15,
-                 aFVExport=ffFVExport(years.all),
                  aPriceChangeFV=0,
                  aElasFVPrice=1.65,
                  aPriceChangeUH=20,
@@ -48,7 +45,6 @@ server <- function(input, output) {
                  aEffectFVPH=6.2,
                  aCalperFV=1,
                  aElasUHFoods=0.725,
-                 aUHCalories=ffUHCalories(years.all),
                  aEffectUHPH=10,
                  aOtherintake=2000, #this needs to be updated to a curve
                  
@@ -72,17 +68,14 @@ server <- function(input, output) {
                  aAvgHeight=1.69,
                  
                  #Core model
-                 aTotal.pop=Total.pop(years.all),
                  aMortalityNGTrate=7.6,
                  aIGTincidenceNO=1.2,
                  aRRofIGTinObese=1.5,
                  aIGTrecovery=10,
                  aDMincidenceNO=7,
                  aRRofDMinObese=9.9,
-                 aRRofSSBs=1.13,
-                 aFractOver65=over.65(years.all),
+                 aRRofSSBs=13,
                  aRRofDMinElderly=1.5,
-                 Fract.Over50=over.50(years.all),
                  aRRofMoratlityDM.Over50=1.5,
                  aRRofMortalityDM.Under50=3.5             
     )
