@@ -7,7 +7,7 @@ library(ggplot2)
 model <- function(time, stocks, auxs){
   
   with(as.list(c(stocks, auxs)),{
-    
+  #  browser()
     #SSB calories
     aEffectSSBPriceChange <- (aElasticity.SSB + aEffectSSB.Campaign + aEffectSSB.Counter)*aSSBPriceChange
     aAvgSSBConsumption <- aSSB.init + (aEffectSSBPriceChange/100)
@@ -56,12 +56,12 @@ model <- function(time, stocks, auxs){
     aBasalCalories <- (sAvgBdWt * (0.024 * aFatFrac + 0.102 * (1-aFatFrac)) + 0.85) * 238.7
     aCaloricBalance <- aDailyIntake - aDailyCalBurned - aBasalCalories - (aFracCalDigestion * aDailyIntake)
     aFracBalanceFat <- 1/(1 +(10.4/sAvgBdWt*aFatFrac)*(4100/9300))
-    aChange.per.day <- aCaloricBalance * (aFracBalanceFat/9300 + (1-aFracBalanceFat/4100))
+    aChange.per.day <- aCaloricBalance * (aFracBalanceFat/9300 + (1-aFracBalanceFat)/4100)
     fChange.wt <- aChange.per.day * 365
     dAvg.wt_dt <- fChange.wt
     
     aMod.BMI <- sAvgBdWt / (aAvgHeight^2)
-    aObeseTotal <- Obesity.fraction.calc(aMod.BMI)
+    aObeseTotal <- Obesity.fraction.calc(aMod.BMI)*100
     aObesefractNGT <- aObeseTotal*0.8
     aObesefractIGT <- aObeseTotal*1.2
     
@@ -88,13 +88,13 @@ model <- function(time, stocks, auxs){
     fIGTMortality <- aMortalityNGTrate/1000*sIGT
     
     # Outflow DM Onset
-    aDMinNonObese <- (100-aObesefractIGT/100)*sIGT*(aDMincidenceNO/100)
+    aDMinNonObese <- ((100-aObesefractIGT)/100)*sIGT*(aDMincidenceNO/100)
     aDMinObese <- (aObesefractIGT/100)*sIGT*(aDMincidenceNO/100)*aRRofDMinObese
     aDMOnsetObesity <- aDMinObese + aDMinNonObese
     aDMOnsetPA<- aDMOnsetObesity*ff(aTotalMVPA/60*7)
     aDMOnsetSSB <- aDMOnsetPA + (aDMOnsetPA*aRRofSSBs*aAvgSSBConsumption/100)
     aDMOnsetAging <- ((over.65(time)/100)*aRRofDMinElderly*aDMOnsetSSB) +
-      ((100-over.65(time)/100)*aDMOnsetSSB)
+      (((100-over.65(time))/100)*aDMOnsetSSB)
     fDMOnset <- aDMOnsetAging
      
     # IGT Stock equation
@@ -103,7 +103,7 @@ model <- function(time, stocks, auxs){
     # DM
     # Outflow DM mortality
     fDMMortality <- (((over.50(time)/100)*aRRofMoratlityDM.Over50*aMortalityNGTrate) +
-                    ((100-over.50(time)/100)*aRRofMortalityDM.Under50*aMortalityNGTrate))/1000*sDM
+                    (((100-over.50(time))/100)*aRRofMortalityDM.Under50*aMortalityNGTrate))/1000*sDM
     
     # DM Stock equation
     dDM_dt <- fDMOnset - fDMMortality

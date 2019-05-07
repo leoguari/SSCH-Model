@@ -46,7 +46,7 @@ server <- function(input, output) {
                  aCalperFV=1,
                  aElasUHFoods=0.725,
                  aEffectUHPH=10,
-                 aOtherintake=2000, #this needs to be updated to a curve
+                 aOtherIntake=2000, #this needs to be updated to a curve
                  
                  #Physical activity
                  aFraction.Bus.Use=75, # this needs to be a curve
@@ -79,6 +79,7 @@ server <- function(input, output) {
                  aRRofMoratlityDM.Over50=1.5,
                  aRRofMortalityDM.Under50=3.5             
     )
+    browser()
     o<-data.frame(ode(y=stocks, times=simtime, func = model, 
                       parms=auxs, method='euler'))
     
