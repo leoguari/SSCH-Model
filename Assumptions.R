@@ -2,19 +2,18 @@ years <-c(1990, 1995, 2000, 2005, 2010, 2015, 2020,
           2025, 2030, 2035, 2040, 2045, 2050)
 years.all <- 1990:2050
 
+#Baseline assumptions
+#Assuming a baseline share of prev of DM in adults 2%, IGT 5%, 93% NGT
+Baseline.Pop <- 1270 #in 1000s so 1.9 million is baseline
+Baseline.NGT <- .93*Baseline.Pop
+Baseline.IGT <-.05*Baseline.Pop
+Baseline.DM <- .02*Baseline.Pop
+
+#Functions for the model
 #Estimating the RR reduction in DM from PA
 PaRRs <- c(1, 0.99, 0.93, 0.87, 0.76, 0.74, 0.64, 0.47)
 PAHrs <- c(0,1, 2, 4, 10, 11, 22, 60)
 ff <- approxfun(PAHrs, PaRRs)
-
-#IGT recovery rate
-aIGTRecovery <- 10
-
-#Assuming a baseline share of prev of DM in adults 2%, IGT 5%, 97% NGT
-Baseline.Pop <- 1200 #in 1000s so 1.2 million is baseline
-Baseline.NGT <- .93*Baseline.Pop
-Baseline.IGT <-.05*Baseline.Pop
-Baseline.DM <- .02*Baseline.Pop
 
 #Estimating population inflow, number of adults added
 # in 1000s
@@ -25,6 +24,7 @@ people <-c(104, 109, 111, 118, 123, 128, 133, 138, 140, 148,
            162, 162, 160, 160, 155, 150, 150, 145, 140, 135,
            131, 126, 121, 111, 99,84, 72, 57, 43, -1, -6)
 Total.pop <- approxfun(years.all, people)
+
 # fraction of population of 65 - for use in RR of mortality
 Fract.Over65 <- c(.14, .13, .14, .13, .13, .14, .15, .16, .19, .21, .23,
                   .25, .27)
@@ -33,43 +33,18 @@ Fract.Over50 <- c(29.22, 28.23, 28.68, 30.40, 31.90, 34.03, 36.16,
                   38.62, 41.09, 44.31, 47.59, 51.08, 54.48)
 over.50 <- approxfun(years, Fract.Over50)
 
-aMortalityNGTrate <- 7.6 # per 1000 in adults from WHO mortality DB
-
 ##Estimating obesity prevalence from average population BMI
 BMI <- c(20:35)
 Ob.prev <- c(0.17, 0.17, 0.18, 0.22, 0.27, 0.3, 0.36, 0.4, 0.43,
              0.47, 0.52, 0.59, 0.62, 0.66, 0.68, 0.7)
 Obesity.fraction.calc <- approxfun(BMI, Ob.prev)
 
-aAvgHeight <- 1.69
-aInitAvgWt <- 62.8 #in kg
-aFatFrac <- 0.3
-aFracCalDigestion <- 0.1
-
-#SSB Calories
-aRRofSSBs <- 1.13 #13% increase in risk per unit consumed per day
-aSSB.init <- 3 #average units consumed per day
-aSSBperUnitCal <- 130
-aElasticity.SSB <- -1.3
-aEffectSSB.Campaign <- -0.5#NEED EVIDENCE FOR THIS FIGURE
-aEffectSSB.Counter <- 2#NEED EVIDENCE FOR THIS FIGURE
-aSSBPriceChange <- 10#percentage that should be input by the model
-#Food Calories
-aOtherIntake <- 2000
-
+#estimating the number of unhealthy calories per year
 UHCalories <- c(200,200, 211, 233, 244, 278, 311, 333,
                  356, 356, 356, 367, 378)
 ffUHCalories <- approxfun(years, UHCalories)
-aElasUHFoods <- 0.725
-aPriceChangeUH <- 20 #percentage
-aEffectUHPH <- 10 #percentage
-aCalperFV <- 1 #kcal/g
-aInitFVIntake <- 40 #g/day
-aEffectFVPH <- 6.2 #grams per day increase consumption FV
-aUHFVCrossPrice <- 0.07 #cross price elasticity from UH foods to FV
-aPriceChangeFV <- 10 #percentage
-aElasFVPrice <- 1.65 #assuming a price decrease
-aInitFVStock <- 250 #in kg per capita
+
+#exports of Fruits and Vegetables from Jamaica Agriculture database
 FVExport.full <- c(14000000, 14387875, 17329309, 18232364, 18250000,
                18250000, 18289920, 15154392, 16252016, 17176887,
                12402018, 15042028, 13400867, 15645654, 13753094,
@@ -84,10 +59,12 @@ FVExport.full <- c(14000000, 14387875, 17329309, 18232364, 18250000,
                17531250, 17531250, 17531250, 17531250, 17531250,
                17753472)
 ffFVExport <- approxfun(years.all, FVExport.full)
+
+#WPP estimates of total population from 2017
 Total.Pop.All.Ages <- c(2424, 2537, 2657, 2745, 2817, 2872, 2913, 2934, 2933, 2908, 2858, 2789, 2704) #WPP 2017
 ffTotalPopulation <- approxfun(years, Total.Pop.All.Ages)
-aImportsTourism <- 60 #percentage
-aLocalTourism <- 15 #percentage
+
+#estimates of Fruit and Vegetable imports from Jamaica Agriculture database
 TotalkgImports.full <- c(2500000, 2897861, 2709680, 6395833, 7729167,
                      8173611, 14975153, 23684661, 29272795, 30399675,
                      37334477, 30088706, 32777478, 30088706, 35296545,
@@ -102,8 +79,8 @@ TotalkgImports.full <- c(2500000, 2897861, 2709680, 6395833, 7729167,
                      19729167, 19729167, 19729167, 19729167, 19729167,
                      19729167)
 ffTotalkgImports <- approxfun(years.all, TotalkgImports.full)
-#aIncreaseinFV <- 10 #percentage
 
+#estimates of total fruit and vegetable production
 InitialFVProduction.Full <- c(503976, 511753, 511753, 519531, 527309, 542865,
                           542865, 542865, 542865, 553157, 450530, 490296,
                           431579, 491473, 414790, 391707, 467802, 427305,
@@ -117,19 +94,57 @@ InitialFVProduction.Full <- c(503976, 511753, 511753, 519531, 527309, 542865,
                           690642)
 ffInitialFVProduction <- approxfun(years.all, InitialFVProduction.Full)
 
-#Physical activity
-aMETsMVPA <- 4.0 # average METS for MVPA
-aWork.init <- 200 # minutes in MVPA at work in 1990
-aWork.decline <- .03 # rate of decrease of MVPA at work from Ng and Popkin
-aTravel.init <- 60
-aTravel.decline <- .017
-aLT.init  <- 15
-aLT.change <- .019
+#Physical activity - function for bus use contributing to minutes in MVPA
 Bus.Minutes.Function <- c(0, 10)
 bus.users <- c(0,100)
 ffBusMinutes.calc <- approxfun(bus.users, Bus.Minutes.Function)
-aFraction.Bus.Use <- 75 # needs to be a curve. Right now only latest data
-aElasticity.Bus.Fare <- 0.15
-aChange.in.Bus.Fare <- 10
-aEffectInfra <- 0.05
-aRRPACampaign <- 0.05
+
+# #Variables that are already called in the model so will be commented out here
+# aMortalityNGTrate <- 7.6 # per 1000 in adults from WHO mortality DB
+# 
+# #IGT recovery rate
+# aIGTRecovery <- 10
+# aAvgHeight <- 1.69
+# aInitAvgWt <- 62.8 #in kg
+# aFatFrac <- 0.3
+# aFracCalDigestion <- 0.1
+# 
+# #SSB Calories
+# aRRofSSBs <- 1.13 #13% increase in risk per unit consumed per day
+# aSSB.init <- 3 #average units consumed per day
+# aSSBperUnitCal <- 130
+# aElasticity.SSB <- -1.3
+# aEffectSSB.Campaign <- -0.5#NEED EVIDENCE FOR THIS FIGURE
+# aEffectSSB.Counter <- 2#NEED EVIDENCE FOR THIS FIGURE
+# aSSBPriceChange <- 10#percentage that should be input by the model
+# #Food Calories
+# aOtherIntake <- 2000
+# 
+# aElasUHFoods <- 0.725
+# aPriceChangeUH <- 20 #percentage
+# aEffectUHPH <- 10 #percentage
+# aCalperFV <- 1 #kcal/g
+# aInitFVIntake <- 40 #g/day
+# aEffectFVPH <- 6.2 #grams per day increase consumption FV
+# aUHFVCrossPrice <- 0.07 #cross price elasticity from UH foods to FV
+# aPriceChangeFV <- 10 #percentage
+# aElasFVPrice <- 1.65 #assuming a price decrease
+# aInitFVStock <- 250 #in kg per capita
+# 
+# aIncreaseinFV <- 10 #percentage
+# aImportsTourism <- 60 #percentage
+# aLocalTourism <- 15 #percentage
+# 
+# aMETsMVPA <- 4.0 # average METS for MVPA
+# aWork.init <- 200 # minutes in MVPA at work in 1990
+# aWork.decline <- .03 # rate of decrease of MVPA at work from Ng and Popkin
+# aTravel.init <- 60
+# aTravel.decline <- .017
+# aLT.init  <- 15
+# aLT.change <- .019
+# 
+# aElasticity.Bus.Fare <- 0.15
+# aChange.in.Bus.Fare <- 10
+# aEffectInfra <- 0.05
+# aRRPACampaign <- 0.05
+# aFraction.Bus.Use <- 75 # needs to be a curve. Right now only latest data

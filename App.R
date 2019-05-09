@@ -3,7 +3,7 @@ source("SSCHMod.R")
 
 library(shiny)
 
-dm_options <- c("Diabetes Incidence", "Diabetes Mortality")
+assumptions_options <- c("RR of mortality in diabetes", "Diabetes Mortality")
 
 ## set up server file
 server <- function(input, output) {
@@ -79,11 +79,11 @@ server <- function(input, output) {
                  aRRofMoratlityDM.Over50=1.5,
                  aRRofMortalityDM.Under50=3.5             
     )
-    browser()
+    #browser()
     o<-data.frame(ode(y=stocks, times=simtime, func = model, 
                       parms=auxs, method='euler'))
     
-    qplot(x=time,y=sDM,data=o) + geom_line()
+    qplot(x=time,y=sDM/(sDM+sIGT+sNGT)*100,data=o) + geom_line()
   })
   
 }
