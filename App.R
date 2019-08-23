@@ -4,7 +4,8 @@ source("SSCHMod.R")
 library(shiny)
 
 assumptions_options <- c("RR of mortality in diabetes", "Diabetes Mortality")
-
+intervention_year <- c(2020:2035)
+policy_interventions <-c("SSB price change")
 ## set up server file
 server <- function(input, output) {
   output$distPlot <- renderPlot({
@@ -24,42 +25,40 @@ server <- function(input, output) {
                  sAvgBdWt=aInitAvgWt,
                  sFV=aInitFVStock) 
     
-    auxs    <- c(aEffectSSBPriceChange=0, #SSB calories
+    auxs    <- c(aInterventionYear=input$intervention_year,
                  aElasticity.SSB=-1.3,
                  aEffectSSB.Campaign=-0.5,
-                 aEffectSSB.Counter=2,
-                 aSSBPriceChange=10,
-                 aAvgSSBConsumption=3.02,
+                 aSSBPriceChange=input$SSB, #intervention point
                  aSSBperUnitCal=140,
                  aSSB.init=3.1, #change this to a distribution
                  
                  #Fruits and Vegetables
-                 aIncreaseinFV=0,
+                 aIncreaseinFV=0, #intervention point
                  aImportsTourism=60,
                  aLocalTourism=15,
-                 aPriceChangeFV=0,
+                 aPriceChangeFV=0,#intervention point
                  aElasFVPrice=1.65,
-                 aPriceChangeUH=20,
+                 aPriceChangeUH=20,#intervention point
                  aUHFVCrossPrice=0.07,
                  aInitFVIntake=40,
-                 aEffectFVPH=6.2,
+                 aEffectFVPH=6.2,#scenario
                  aCalperFV=1,
                  aElasUHFoods=0.725,
-                 aEffectUHPH=10,
+                 aEffectUHPH=10, #scenario
                  aOtherIntake=2000, #this needs to be updated to a curve
                  
                  #Physical activity
                  aFraction.Bus.Use=75, # this needs to be a curve
                  aElasticity.Bus.Fare=0.15,
-                 aChange.in.Bus.Fare=0,
+                 aChange.in.Bus.Fare=0,#intervention point
                  aWork.init=200,
                  aWork.decline=0.03,
                  aTravel.init=60,
                  aTravel.decline=0.017,
                  aLT.init=15,
                  aLT.change=0.019,
-                 aEffectInfra=0.05,
-                 aRRPACampaign=0.05,
+                 aEffectInfra=0.05, #scenario
+                 aRRPACampaign=0.05, #scenario
                  aMETsMVPA=4.0,
                  
                  #Obesity
@@ -72,7 +71,7 @@ server <- function(input, output) {
                  aIGTincidenceNO=1.2,
                  aRRofIGTinObese=1.5,
                  aIGTrecovery=10,
-                 aDMincidenceNO=7,
+                 aDMincidenceNO=10,
                  aRRofDMinObese=9.9,
                  aRRofSSBs=13,
                  aRRofDMinElderly=1.5,
@@ -92,9 +91,13 @@ server <- function(input, output) {
 ui <- fluidPage(
   sidebarLayout(
     sidebarPanel(
-      radioButtons(inputId = "DM_options", label = "Select Diabetes Disease Measures:", choices = dm_options),
+      selectInput("intervention_year", "Intervention Year:", 
+                    choices=intervention_year),
+      radioButtons(inputId = "assumptions_options", label = "Select Diabetes Disease Measures:", 
+                   choices = assumptions_options),
       sliderInput("incDM", "Incidence in 1000s:", min = 1, max = 100, value = 10),
-      sliderInput("mort", "All-cause mortality in 1000s:", min = 1, max = 100, value = 20)
+      sliderInput("mort", "All-cause mortality in 1000s:", min = 1, max = 100, value = 20),
+      sliderInput("SSB", "Price change for sugar-sweetened beverages:", min=1, max=50, value=10)
     ),
     mainPanel(plotOutput("distPlot"))
   )

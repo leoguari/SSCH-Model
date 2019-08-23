@@ -9,7 +9,11 @@ model <- function(time, stocks, auxs){
   with(as.list(c(stocks, auxs)),{
   #  browser()
     #SSB calories
-    aEffectSSBPriceChange <- (aElasticity.SSB + aEffectSSB.Campaign + aEffectSSB.Counter)*aSSBPriceChange
+    ## function for calculating SSB price change from intervention start date
+    SSB.price <- c(rep(0, 61-length(aInterventionYear)), rep(aSSBPriceChange, length(aInterventionYear)))
+    ffSSB.price.change <- approxfun(years.all, SSB.price)
+    
+    aEffectSSBPriceChange <- (aElasticity.SSB + aEffectSSB.Campaign)*ffSSB.price.change(aInterventionYear)
     aAvgSSBConsumption <- aSSB.init + (aEffectSSBPriceChange/100)
     aCaloriesSSB <- aAvgSSBConsumption*aSSBperUnitCal
      #Food calories

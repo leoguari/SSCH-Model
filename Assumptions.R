@@ -5,14 +5,14 @@ years.all <- 1990:2050
 #Baseline assumptions
 #Assuming a baseline share of prev of DM in adults 2%, IGT 5%, 93% NGT
 Baseline.Pop <- 1270 #in 1000s so 1.9 million is baseline
-Baseline.NGT <- .93*Baseline.Pop
-Baseline.IGT <-.05*Baseline.Pop
-Baseline.DM <- .02*Baseline.Pop
+Baseline.NGT <- .88*Baseline.Pop
+Baseline.IGT <-.08*Baseline.Pop
+Baseline.DM <- .04*Baseline.Pop
 
 #Functions for the model
 #Estimating the RR reduction in DM from PA
 PaRRs <- c(1, 0.99, 0.93, 0.87, 0.76, 0.74, 0.64, 0.47)
-PAHrs <- c(0,1, 2, 4, 10, 11, 22, 60)
+PAHrs <- c(0, 1, 2, 4, 10, 11, 22, 60)
 ff <- approxfun(PAHrs, PaRRs)
 
 #Estimating population inflow, number of adults added
@@ -99,52 +99,6 @@ Bus.Minutes.Function <- c(0, 10)
 bus.users <- c(0,100)
 ffBusMinutes.calc <- approxfun(bus.users, Bus.Minutes.Function)
 
-# #Variables that are already called in the model so will be commented out here
-# aMortalityNGTrate <- 7.6 # per 1000 in adults from WHO mortality DB
-# 
-# #IGT recovery rate
-# aIGTRecovery <- 10
-# aAvgHeight <- 1.69
-# aInitAvgWt <- 62.8 #in kg
-# aFatFrac <- 0.3
-# aFracCalDigestion <- 0.1
-# 
-# #SSB Calories
-# aRRofSSBs <- 1.13 #13% increase in risk per unit consumed per day
-# aSSB.init <- 3 #average units consumed per day
-# aSSBperUnitCal <- 130
-# aElasticity.SSB <- -1.3
-# aEffectSSB.Campaign <- -0.5#NEED EVIDENCE FOR THIS FIGURE
-# aEffectSSB.Counter <- 2#NEED EVIDENCE FOR THIS FIGURE
-# aSSBPriceChange <- 10#percentage that should be input by the model
-# #Food Calories
-# aOtherIntake <- 2000
-# 
-# aElasUHFoods <- 0.725
-# aPriceChangeUH <- 20 #percentage
-# aEffectUHPH <- 10 #percentage
-# aCalperFV <- 1 #kcal/g
-# aInitFVIntake <- 40 #g/day
-# aEffectFVPH <- 6.2 #grams per day increase consumption FV
-# aUHFVCrossPrice <- 0.07 #cross price elasticity from UH foods to FV
-# aPriceChangeFV <- 10 #percentage
-# aElasFVPrice <- 1.65 #assuming a price decrease
-# aInitFVStock <- 250 #in kg per capita
-# 
-# aIncreaseinFV <- 10 #percentage
-# aImportsTourism <- 60 #percentage
-# aLocalTourism <- 15 #percentage
-# 
-# aMETsMVPA <- 4.0 # average METS for MVPA
-# aWork.init <- 200 # minutes in MVPA at work in 1990
-# aWork.decline <- .03 # rate of decrease of MVPA at work from Ng and Popkin
-# aTravel.init <- 60
-# aTravel.decline <- .017
-# aLT.init  <- 15
-# aLT.change <- .019
-# 
-# aElasticity.Bus.Fare <- 0.15
-# aChange.in.Bus.Fare <- 10
-# aEffectInfra <- 0.05
-# aRRPACampaign <- 0.05
-# aFraction.Bus.Use <- 75 # needs to be a curve. Right now only latest data
+## Intervention variables, starting point of intervention 2020
+SSB.price <- c(rep(0, 61-length(aInterventionYear)), rep(SSB.price.change.input, length(aInterventionYear)))
+ffSSB.price.change <- approxfun(years.all, SSB.price)
