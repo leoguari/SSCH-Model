@@ -29,6 +29,7 @@ model <- function(time, stocks, auxs){
     fFVExport <- ffFVExport(time)/ffTotalPopulation(time) #per capita export per year
     fFVWaste <- fFVProduction * .3
     
+    #currently modeling an increase in price for FV - if a decrease needed, then needs to be (-)
     aEffectFVPrice <- aPriceChangeFV * aElasFVPrice
     aEffectUHPrice <- aPriceChangeUH * aUHFVCrossPrice
     
@@ -37,7 +38,7 @@ model <- function(time, stocks, auxs){
       (aInitFVIntake*aEffectUHPrice/100) + ((aEffectFVPH/1000)*365)
     
     aFVkcalperday <- aCalperFV*(fFVConsumption/365)*1000
-    aEffectUHTax <- aPriceChangeUH * aElasUHFoods
+    aEffectUHTax <- aPriceChangeUH * aElasUHFoods #elasticity should be negative
     aUHFoods <- ffUHCalories(time) + (ffUHCalories(time)*aEffectUHTax/100) - (ffUHCalories(time)*aEffectUHPH/100)
     aDailyIntake <- aUHFoods + aFVkcalperday + aOtherIntake + aCaloriesSSB
     

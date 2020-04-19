@@ -1,7 +1,7 @@
 years <-c(1990, 1995, 2000, 2005, 2010, 2015, 2020,
           2025, 2030, 2035, 2040, 2045, 2050)
 years.all <- 1990:2050
-
+aInterventionYear <- 2020
 #Baseline assumptions
 #Assuming a baseline share of prev of DM in adults 2%, IGT 5%, 93% NGT
 Baseline.Pop <- 1270 #in 1000s so 1.9 million is baseline

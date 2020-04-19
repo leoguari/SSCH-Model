@@ -37,18 +37,18 @@ server <- function(input, output) {
                  aImportsTourism=60,
                  aLocalTourism=15,
                  aPriceChangeFV=0,#intervention point
-                 aElasFVPrice=1.65,
+                 aElasFVPrice=-.65,
                  aPriceChangeUH=20,#intervention point
                  aUHFVCrossPrice=0.07,
                  aInitFVIntake=40,
                  aEffectFVPH=6.2,#scenario
                  aCalperFV=1,
-                 aElasUHFoods=0.725,
+                 aElasUHFoods=-0.9,
                  aEffectUHPH=10, #scenario
                  aOtherIntake=2000, #this needs to be updated to a curve
                  
                  #Physical activity
-                 aFraction.Bus.Use=75, # this needs to be a curve
+                 aFraction.Bus.Use=5, # portion of people moving from car to bus - should start neg and go pos
                  aElasticity.Bus.Fare=0.15,
                  aChange.in.Bus.Fare=0,#intervention point
                  aWork.init=200,
@@ -75,7 +75,7 @@ server <- function(input, output) {
                  aRRofDMinObese=9.9,
                  aRRofSSBs=13,
                  aRRofDMinElderly=1.5,
-                 aRRofMoratlityDM.Over50=1.5,
+                 aRRofMortalityDM.Over50=1.5,
                  aRRofMortalityDM.Under50=3.5             
     )
     #browser()
