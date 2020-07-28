@@ -3,9 +3,9 @@ source("SSCHMod.R")
 
 library(shiny)
 
-assumptions_options <- c("RR of mortality in diabetes", "Diabetes Mortality")
-intervention_year <- c(2020:2035)
-policy_interventions <-c("SSB price change")
+#assumptions_options <- c("RR of mortality in diabetes", "Diabetes Mortality")
+#intervention_year <- c(2020:2035)
+#policy_interventions <-c("SSB price change")
 ## set up server file
 server <- function(input, output) {
   output$distPlot <- renderPlot({
@@ -58,7 +58,7 @@ server <- function(input, output) {
                  aLT.init=15,
                  aLT.change=0.019,
                  aEffectInfra=0.05, #scenario
-                 aRRPACampaign=0.05, #scenario
+                 aRRPACampaign=1.15, #scenario
                  aMETsMVPA=4.0,
                  
                  #Obesity
@@ -67,16 +67,17 @@ server <- function(input, output) {
                  aAvgHeight=1.69,
                  
                  #Core model
-                 aMortalityNGTrate=7.6,
+                 aMortalityNGTrate.under50=7.6,
+                 aMortalityNGTrate.over50=48.7,
                  aIGTincidenceNO=1.2,
-                 aRRofIGTinObese=1.5,
+                 aRRofIGTinObese=1.7,
                  aIGTrecovery=10,
-                 aDMincidenceNO=10,
-                 aRRofDMinObese=9.9,
+                 aDMincidenceNO=9,
+                 aRRofDMinObese=1.6,
                  aRRofSSBs=13,
                  aRRofDMinElderly=1.5,
-                 aRRofMortalityDM.Over50=1.5,
-                 aRRofMortalityDM.Under50=3.5             
+                 aRRofMortalityDM.Over50=1.65,
+                 aRRofMortalityDM.Under50=3.0             
     )
     #browser()
     o<-data.frame(ode(y=stocks, times=simtime, func = model, 
