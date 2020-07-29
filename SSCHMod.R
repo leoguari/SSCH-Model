@@ -210,7 +210,7 @@ model <- function(time, stocks, auxs){
   o<-data.frame(ode(y=stocks, times=simtime, func = model, 
                     parms=auxs, method='euler'))
   
-  qplot(x=time,y=(sDM/(sDM+sIGT+sNGT)*100),data=o) + geom_line()
+  qplot(x=time,y=(sDM/(sDM+sIGT+sNGT)*100), xlab = "Year", ylab="Diabetes Prevalence (%)", data=o) + geom_line()
 
 
 
@@ -262,15 +262,59 @@ parRange <- data.frame(
 
 rownames(parRange) <- c("aEffectSSB.Campaign", "aSSBperUnitCal", "aSSB.init", 
                         "aImportsTourism", "aLocalTourism", "aElasFVPrice", 
-                        "aInitFVIntake", "aEffectFVPH", "aCalperFV", "aElasUHFood", "aEffectUHPH",
+                        "aInitFVIntake", "aEffectFVPH", "aCalperFV", "aElasUHFoods", "aEffectUHPH",
                         "aElasticity.Bus.Fare", "aWork.init", "aTravel.init", "aLT.init", "aEffectInfra", 
                         "aRRPACampaign", "aMortalityNGTrate.under50", "aMortalityNGTrate.over50",
                         "aIGTincidenceNO", "aRRofIGTinObese", "aIGTrecovery", "aDMincidenceNO",
-                        "aRRofDMinObese", "aRRofSSBs", "aRRofDMinElderly", "aRRofMortalityDM.Over50",
-                        "aRRofMortalityDM.Under50")
+                        "aRRofDMinObese", "aRRofSSBs", "aRRofDMinElderly", "aRRofMortalityDM.over50",
+                        "aRRofMortalityDM.under50")
 
-p <- data.frame(Latinhyper(parRange, 5)) #need to determine number of runs
-# add in constants
  
+## define function for sensitivity run
+sensRun <- function(p){
+  
+  g.SimsRuns <<-list(length=nrow(p))
+  
+  for (i in 1:nrow(p)){
+    #init <- p[i, "xyz"]
+    
+    auxs <- c(aInterventionYear=2020,
+              aElasticity.SSB=-1.3,
+              aSSBPriceChange=0,
+              aIncreaseinFV=0,
+              aPriceChangeFV=0,#intervention point
+              aPriceChangeUH=0,#intervention point
+              aUHFVCrossPrice=0.07,
+              aFVPH.switch=0, #set to 1 for intervention
+              aUHPH.switch=0, #set to 1 for intervention
+              aOtherIntake=2100, 
+              aChange.in.Bus.Fare=0,#intervention point
+              aInfra.switch=0, #change to 1 for intervention
+              aPAPH.Campaign=0, #change to 1 for intervention
+              aMETsMVPA=4.0,
+              aFatFrac=0.3,
+              aFracCalDigestion=0.1,
+              aAvgHeight=1.65, p[i, 1:28])
+    
+    stocks <- c(sNGT=1270*95,
+                sIGT=1270*0.03,
+                sDM=1270*0.02,
+                sAvgBdWt=71.7,
+                sFV=250)
+    
+    o<-data.frame(ode(y=stocks, times=simtime, func = model, 
+                      parms=auxs, method='euler'))
+    o$run <- i
+    g.SimsRuns[[i]] <<- o
+  }
+}
 
+#create random parameter estimates within ranges for sensitivity - latin hypercube
+p <- data.frame(Latinhyper(parRange, 100)) #need to determine number of runs
+sensRun(p)
 
+library(plyr)
+df<-rbind.fill(g.SimsRuns)
+
+p1 <- ggplot(df, aes(x=time, y=sDM, color=run, group=run)) +
+  geom_line()
