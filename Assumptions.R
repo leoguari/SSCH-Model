@@ -44,10 +44,17 @@ Ob.prev <- c(0, 0, 0, 0.03, 0.09, 0.1495, 0.2097, 0.2699, 0.3301, 0.3903,
 Obesity.fraction.calc <- approxfun(BMI, Ob.prev)
 
 #estimating the number of unhealthy calories per year
-UHCalories <- c(200,200, 211, 233, 244, 278, 311, 333,
-                 356, 356, 356, 367, 378)
+UHCalories <- c(272.4, 296.6, 320.9, 339.2, 351.3, 369.5, 387.8, 416.1,
+                 442.4, 460.6, 468.7, 478.9, 484.9)
 ffUHCalories <- approxfun(years, UHCalories)
 
+#estimating calories from other food sources
+OtherIntake <- c(2020, 2038, 2056, 2074, 2093, 2111, 2129, 2147, 2165, 2202, 2220, 2238,
+                 2257, 2275, 2311, 2325, 2339, 2352, 2366, 2380, 2393, 2421, 2430, 2439, 
+                 2457, 2466, 2475, 2493, 2498, 2503, 2512, 2530, 2566, 2572, 2585, 2597, 
+                 2621, 2630, 2639, 2657, 2664, 2670, 2694, 2712, 2712, 2712, 2717, 2721, 
+                 2730, 2730, 2730, 2735, 2739, 2749, 2749, 2749, 2753, 2758, 2762, 2730, 2785)
+ffOtherIntake <- approxfun(years.all, OtherIntake)
 #exports of Fruits and Vegetables from Jamaica Agriculture database
 FVExport.full <- c(14000000, 14387875, 17329309, 18232364, 18250000,
                18250000, 18289920, 15154392, 16252016, 17176887,
@@ -109,15 +116,13 @@ Bus.Minutes.Function <- c(0, 10)
 bus.users <- c(0, 100)
 ffBusMinutes.calc <- approxfun(bus.users, Bus.Minutes.Function, yleft=0)
 
-##Work MVPA decline function
-Work.MVPA.Function <- c(198, 196, 191, 191, 189, 180, 176, 173,
-                        171, 169, 164, 162, 158, 153, 151, 149,
-                        144, 138, 133, 131, 129, 122, 118, 116,
-                        113, 109, 107, 106, 104, 100, 100, 100,
-                        100, 98, 96, 96, 93, 93, 91, 89, 89, 87,
-                        87, 84, 82, 82, 80, 78, 78, 73, 73, 71,
-                        67, 62, 62, 60, 58, 56, 56, 53, 51)
-ff.work.mvpa <- approxfun(years.all, Work.MVPA.Function)
+##Occupational MVPA decline function
+#assuming an annualized reduction in occupational PA of 1.2% from Ng and Popkin and initial occupational MVPA of 50 min per day
+Initial.Work <- 50
+Work.MVPA.Function <- c(Initial.Work, 13.4)
+ff.work.mvpa <- approxfun(c(1990, 2050), Work.MVPA.Function)
+ff.work.mvpa.stable <- 30
+
 ##Travel MVPA decline function
 Travel.MVPA.Function <- c(61, 61, 60, 60, 59, 59, 58, 57, 56, 
                           56, 55, 54, 54, 53, 52, 52, 51, 50,
@@ -127,7 +132,7 @@ Travel.MVPA.Function <- c(61, 61, 60, 60, 59, 59, 58, 57, 56,
                           31, 31, 31, 31, 30, 29, 29, 27, 27,
                           26, 26, 25, 25, 25, 25, 24)
 ff.travel.mvpa <- approxfun(years.all, Travel.MVPA.Function)
-
+ff.travel.mvpa.stable <- 61
 #Leisure MVPA decline function
 Leisure.MVPA.Function <- c(25, 25, 25, 25, 24, 24, 24, 24, 23,
                            23, 23, 23, 22, 22, 22, 21, 21, 21,
@@ -137,10 +142,8 @@ Leisure.MVPA.Function <- c(25, 25, 25, 25, 24, 24, 24, 24, 23,
                            11, 11, 11, 10, 10, 10, 9, 9, 9, 8,
                            8, 7, 7, 6, 6, 6)
 ff.leisure.mvpa <- approxfun(years.all, Leisure.MVPA.Function)
-## Intervention variables, starting point of intervention 2020
-SSB.price.change.input=0
-SSB.price <- c(rep(0, 61-length(aInterventionYear)), rep(SSB.price.change.input, length(aInterventionYear)))
-#ffSSB.price.change <- approxfun(years.all, SSB.price)
+ff.leisure.mvpa.stable < - 25
+
 
 
 
