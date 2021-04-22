@@ -4,6 +4,9 @@
 library(deSolve)
 library(ggplot2)
 library(FME)
+library(plyr)
+library(grid)
+library(gridExtra)
 
 model <- function(time, stocks, auxs){
   
@@ -20,7 +23,7 @@ model <- function(time, stocks, auxs){
     ffSSB.price.change <- approxfun(years.all, SSB.price)
     
     aEffectSSBPriceChange <- (aElasticity.SSB + aEffectSSB.Campaign)*ffSSB.price.change(time)
-    aAvgSSBConsumption <- aSSB.init + (aEffectSSBPriceChange/100)
+    aAvgSSBConsumption <- ffSSB(time) + (aEffectSSBPriceChange/100)
     aCaloriesSSB <- aAvgSSBConsumption*aSSBperUnitCal
      #Food calories
   
@@ -32,12 +35,12 @@ model <- function(time, stocks, auxs){
                         ((ffFV.increase(time))/100*ffInitialFVProduction(time)*1000))/ffTotalPopulation(time)
     
     aFVImports <- ffTotalkgImports(time)/ffTotalPopulation(time)
-    fFVProduction <- (ffTotalkgImports(time) - (ffTotalkgImports(time)*aImportsTourism/100)) + 
+    fFVSupply <- (ffTotalkgImports(time) - (ffTotalkgImports(time)*aImportsTourism/100)) + 
       (aFVProduction - (aFVProduction*aLocalTourism/100))
     
     #outflow of waste and export
     fFVExport <- ffFVExport(time)/ffTotalPopulation(time) #per capita export per year
-    fFVWaste <- fFVProduction * .3
+    fFVWaste <- sFV * .3
     
     #currently modeling an increase in price for FV - if a decrease needed, then needs to be (-)
     Price.change.FV <- intervention.year(aPriceChangeFV)
@@ -62,35 +65,35 @@ model <- function(time, stocks, auxs){
     UH.price.change <- intervention.year(aPriceChangeUH)
     ffUH.price.change <- approxfun(years.all, UH.price.change)
     
-    aEffectUHTax <- ffUH.price.change(time) * aElasUHFoods #elasticity should be negative
+    aEffectUHTax <- ffUH.price.change(time) * aElasUHFoods #elasticity needs to be negative
     
     UHPH <- intervention.year(aUHPH.switch)
     ffUHPH <- approxfun(years.all, UHPH)
     
-    aUHFoods <- ffUHCalories(time) + (ffUHCalories(time)*aEffectUHTax/100) - 
+    aUHFoods <- ffUHCalories(time) + (ffUHCalories(time)*aEffectUHTax/100) + 
       (ffUHCalories(time)*(aEffectUHPH/100)*ffUHPH(time))
     
     aDailyIntake <- aUHFoods + aFVkcalperday + ffOtherIntake(time) + aCaloriesSSB
   
     #Fruit and vegetable stock equation
-    dFV_dt <-  fFVProduction - fFVWaste - fFVExport - fFVConsumption
+    dFV_dt <-  fFVSupply - fFVWaste - fFVExport - fFVConsumption
     
     #Physical activity
-    bus.fare.change <- intervention.year(aChange.in.Bus.Fare)
-    ffbus.fare.change <- approxfun(years.all, bus.fare.change)
-    
-    aNew.Bus.Use <- ffbus.to.car(time) + (aElasticity.Bus.Fare*ffbus.fare.change(time))
-    aBusMinutes <- ffBusMinutes.calc(aNew.Bus.Use)
     aWorkMVPA <- ff.work.mvpa(time)
     aTravelMVPA <- ff.travel.mvpa(time)
     aLTMVPA <- ff.leisure.mvpa(time)
+    aDomMVPA <- ff.domestic.mvpa(time)
     
     infra.change <- intervention.year(aInfra.switch)
     ffinfra.change <- approxfun(years.all, infra.change)
     
-    aActiveTransport <- aTravelMVPA + (aTravelMVPA*aEffectInfra/100)*ffinfra.change(time) + aBusMinutes
+    public.transport <- intervention.year(aPublic.switch)
+    ffpublic.transport <- approxfun(years.all, public.transport)
+    
+    aActiveTransport <- aTravelMVPA + (aTravelMVPA*aEffectInfra/100)*ffinfra.change(time) + 
+      ffpublic.transport(time)*aPublic.Transport
     aLTMVPA.with.infra <- aLTMVPA + aLTMVPA*(aEffectInfra/100)*ffinfra.change(time)
-    aTotalMVPA.noPH <- aActiveTransport + aWorkMVPA + aLTMVPA.with.infra
+    aTotalMVPA.noPH <- aActiveTransport + aWorkMVPA + aLTMVPA.with.infra + aDomMVPA
     
     PA.campaign <- intervention.year(aPAPH.Campaign)
     ffPA.campaign <- approxfun(years.all, PA.campaign)
@@ -100,55 +103,67 @@ model <- function(time, stocks, auxs){
     aDailyCalBurned <- (aTotalMETs*3.5*sAvgBdWt)/200
     
     ##Obesity module
+    aMod.BMI <- sAvgBdWt / (aAvgHeight^2)
+    BMI.M <- aMod.BMI/(per.men + per.women*BMI.ratio)*100
+    BMI.W <- BMI.ratio * BMI.M
+    aFatFrac.M <- ((3.76*BMI.M) - (0.04*BMI.M^2) - 47.8)/100
+    aFatFrac.W <- ((4.35*BMI.W) - (0.05*BMI.W^2) - 46.24)/100
+    aFatFrac <- (aFatFrac.W + aFatFrac.M)/2
+   
     aBasalCalories <- (sAvgBdWt * (0.024 * aFatFrac + 0.102 * (1-aFatFrac)) + 0.85) * 238.7
     aCaloricBalance <- aDailyIntake - aDailyCalBurned - aBasalCalories - (aFracCalDigestion * aDailyIntake)
     aFracBalanceFat <- 1/(1 +((10.4/(sAvgBdWt*aFatFrac))*(4100/9300)))
     fChange.wt <- aCaloricBalance * ((aFracBalanceFat/9300) + ((1-aFracBalanceFat)/4100))
     dAvg.wt_dt <- fChange.wt
-    
-    aMod.BMI <- sAvgBdWt / (aAvgHeight^2)
-    aObeseTotal <- Obesity.fraction.calc(aMod.BMI)*100
+    aObeseTotal <- 43 + -6.65*aMod.BMI + 0.233*aMod.BMI^2
     aObesefractNGT <- aObeseTotal*0.8
     aObesefractIGT <- aObeseTotal*1.2
     
     ## Core Model
     # NGT
     # Inflow of adult population
-    fAdultGrowth <- Total.pop(time)
+    fAdultGrowth <- pop.inflow(time)
     
     # Outflow NGT mortality
-    under.50 <- 100-over.50(time)
-    fNGTMortality <- (sNGT*(aMortalityNGTrate.under50/1000)*(under.50/100)) +
-      (sNGT*(aMortalityNGTrate.over50/1000)*((over.50(time)/100)))
+    under.55 <- 100-over.55(time)
+    fNGTMortality <- (sNGT*(aMortalityNGTrate.under55/1000)*(under.55/100)) +
+      (sNGT*(aMortalityNGTrate.over55/1000)*(over.55(time)/100))
       
-    # Outflow of new cases of IGT/IFG
-    fIGTOnset <- (sNGT*(aObesefractNGT/100)*(aIGTincidenceNO/100)*aRRofIGTinObese) +
-      (sNGT*((100-aObesefractNGT)/100)*(aIGTincidenceNO/100))
+    # Flow of new cases to IGT/IFG
+    aIGTObese <- sNGT*(aObesefractNGT/100)*(aIGTincidenceNO/1000)*aRRofIGTinObese
+    aIGTNonObese <- sNGT*((100-aObesefractNGT)/100)*(aIGTincidenceNO/1000)
+    fIGTOnset <- aIGTObese + aIGTNonObese
     
     # Inflow of IGT recovery
     # create an option for modifying the rate of recovery as a HC intervention
-    #HC.IGT <-  c(rep(10, 2050-aInterventionYear), rep(aIGTrecovery, 61-(2050-aInterventionYear)))
-    #ffHC.IGT <- approxfun(years.all, HC.IGT)
-    #aIGTrecovery <- ffHC.IGT(time)
     
     fIGTRecovery <- aIGTrecovery/100*sIGT
     
     # NGT stock equation
-    dNGT_dt <- fAdultGrowth + fIGTRecovery - fIGTOnset - fNGTMortality
+    dNGT_dt <- fAdultGrowth - fNGTMortality - fIGTOnset + fIGTRecovery 
     
     # IGT
     # Outflow IGT mortality
-    fIGTMortality <- (sIGT*(aMortalityNGTrate.under50/1000)*(under.50/100)) +
-      (sIGT*(aMortalityNGTrate.over50/1000)*(over.50(time)/100))
+    fIGTMortality <- (sIGT*(aMortalityNGTrate.under55/1000)*(under.55/100)) +
+      (sIGT*(aMortalityNGTrate.over55/1000)*(over.55(time)/100))
     
     # Outflow DM Onset
-    aDMinNonObese <- sIGT*((100-aObesefractIGT)/100)*(aDMincidenceNO/100)
-    aDMinObese <- (aObesefractIGT/100)*sIGT*(aDMincidenceNO/100)*aRRofDMinObese
+    aDMinNonObese <- sIGT*((100-aObesefractIGT)/100)*(aDMincidenceNO/1000)
+    aDMinObese <- (aObesefractIGT/100)*sIGT*(aDMincidenceNO/1000)*aRRofDMinObese
     aDMOnsetObesity <- aDMinObese + aDMinNonObese
-    aDMOnsetPA<- aDMOnsetObesity*ff((aTotalMVPA/60)*7)
+    aDMOnsetPA<- aDMOnsetObesity*ff.LTPA.RR(aLTMVPA.with.infra*7/60)
     aDMOnsetSSB <- aDMOnsetPA + (aDMOnsetPA*(aRRofSSBs/100)*aAvgSSBConsumption)
-    aDMOnsetAging <- ((over.65(time)/100)*aRRofDMinElderly*aDMOnsetSSB) +
-      (((100-over.65(time))/100)*aDMOnsetSSB)
+    
+    FV.Daily <- aInitFVIntake*1000/365
+    
+    if (FV.Daily > 400) {
+      aDMwithFV <- 0.95*aDMOnsetSSB
+    } else {
+      aDMwithFV <- aDMOnsetSSB
+    }
+    
+    aDMOnsetAging <- ((over.65(time)/100)*aRRofDMinElderly*aDMwithFV) +
+      (((100-over.65(time))/100)*aDMwithFV)
     fDMOnset <- aDMOnsetAging
      
     # IGT Stock equation
@@ -156,12 +171,15 @@ model <- function(time, stocks, auxs){
     
     # DM
     # Outflow DM mortality
-    fDMMortality <- (sDM*(under.50/100)*aRRofMortalityDM.under50*(aMortalityNGTrate.under50/1000)) +
-      (sDM*aRRofMortalityDM.over50*(aMortalityNGTrate.over50/1000)*(over.50(time)/100))
+    fDMMortality <- (sDM*(under.55/100)*aRRofMortalityDM.under55*(aMortalityNGTrate.under55/1000)) +
+      (sDM*aRRofMortalityDM.over55*(aMortalityNGTrate.over55/1000)*(over.55(time)/100))
    
     # DM Stock equation
     dDM_dt <- fDMOnset - fDMMortality
     
+    #estimate prevalence and incidence
+    dmprev <- sDM*100/(sDM + sIGT + sNGT)
+    dminc <- fDMOnset * 1000/(sIGT + sNGT)
     
     # All the results for the time step
     ans <- list(c(dNGT_dt, dIGT_dt, dDM_dt, dAvg.wt_dt, dFV_dt),
@@ -175,7 +193,9 @@ model <- function(time, stocks, auxs){
                 DMMortality=fDMMortality,
                 DMNetFlow=dDM_dt,
                 BWtAvg=dAvg.wt_dt,
-                under.50=under.50)
+                Obesity=aObeseTotal,
+                dmprev=dmprev,
+                dminc=dminc)
     
   })
 }
@@ -196,192 +216,344 @@ model <- function(time, stocks, auxs){
                sAvgBdWt=aInitAvgWt,
                sFV=aInitFVStock) 
   
-  auxs    <- c(aInterventionYear=2020,
-               
-               #interventions
-               aSSBPriceChange=0, #intervention point
-               aIncreaseinFV=0, #intervention point for increase in production as a percentage
-               aPriceChangeFV=0,#intervention point change as a percentage (+ for increase, - for decrease)
-               aPriceChangeUH=0,#intervention point change as a percentage
-               aFVPH.switch=0, #set to 1 for intervention, fruit and veg consumption PH campaign
-               aUHPH.switch=0, #set to 1 for intervention, traffic light labeling of food
-               
-               aChange.in.Bus.Fare=0,#intervention point, change as a percentage
-               aInfra.switch=0, #change to 1 for intervention, infrastructure for active transport
-               aPAPH.Campaign=0, #change to 1 for intervention, PA awareness campaign
-               
-               #ssb assumptions
-               aElasticity.SSB=-1.3,
-               aEffectSSB.Campaign=-0.5,
-               aSSBperUnitCal=130,
-               aSSB.init=2,
-               
-               #Calories from food assumptions
-               aImportsTourism=60,
-               aLocalTourism=15,
-               aElasFVPrice=-.65,
-               aUHFVCrossPrice=0.07,
-               aInitFVIntake=109.5,
-               aEffectFVPH=6.2,
-               aCalperFV=1,
-               aElasUHFoods=-0.9,
-               aEffectUHPH=3.59,#traffic light system of food labeling
-               
-               #Physical activity calories
-               aElasticity.Bus.Fare=0.15, 
-               #aWork.init=200,
-               #aTravel.init=60,
-               #aLT.init=25,
-               aEffectInfra=16, 
-               aRRPACampaign=1.28, 
-               aMETsMVPA=4.0,
-               
-               #Obesity
-               aFatFrac=0.3,
-               aFracCalDigestion=0.1,
-               aAvgHeight=1.65,
-               
-               #Core model
-               aMortalityNGTrate.under50=7.6,
-               aMortalityNGTrate.over50=48.7,
-               aIGTincidenceNO=4.5,
-               aRRofIGTinObese=1.5,
-               aIGTrecovery=10, 
-               aDMincidenceNO=9,
-               aRRofDMinObese=1.6,
-               aRRofSSBs=13,
-               aRRofDMinElderly=1.5,
-               aRRofMortalityDM.over50=1.65, 
-               aRRofMortalityDM.under50=3.0)
+  auxs <- c(aInterventionYear=2020,
+    
+    #interventions
+    aSSBPriceChange=0, #intervention point
+    aIncreaseinFV=0, #intervention point for increase in production as a percentage
+    aPriceChangeFV=0,#intervention point change as a percentage (+ for increase, - for decrease)
+    aPriceChangeUH=0,#intervention point change as a percentage
+    aFVPH.switch=0, #set to 1 for intervention, fruit and veg consumption PH campaign
+    aUHPH.switch=0, #set to 1 for intervention, traffic light labeling of food
+    aInfra.switch=0, #change to 1 for intervention, infrastructure for active transport
+    aPublic.switch=0, #change to 1 for interventions to increase public transportation
+    aPAPH.Campaign=0, #change to 1 for intervention, PA awareness campaign
+    
+    #ssb assumptions
+    aElasticity.SSB=-1.3,
+    aEffectSSB.Campaign=-0.5,
+    aSSBperUnitCal=130,
+    
+    #Calories from food assumptions
+    aImportsTourism=60,
+    aLocalTourism=15,
+    aElasFVPrice=-.65,
+    aUHFVCrossPrice=0.07,
+    aInitFVIntake=73,
+    aEffectFVPH=6.2,
+    aCalperFV=1,
+    aElasUHFoods=-0.09,
+    aEffectUHPH=-3.59,#traffic light system of food labeling
+    
+    #Physical activity calories
+    aPublic.Transport=4.3, # min/day added from better public transport
+    aEffectInfra=16, 
+    aRRPACampaign=1.28, 
+    aMETsMVPA=4.0,
+    
+    #Obesity
+    aFracCalDigestion=0.1,
+    aAvgHeight=1.65,
+    
+    #Core model
+    aMortalityNGTrate.under55=2,
+    aMortalityNGTrate.over55=32,
+    aIGTincidenceNO=20,
+    aRRofIGTinObese=1.32,
+    aIGTrecovery=10, 
+    aDMincidenceNO=35,
+    aRRofDMinObese=2.3,
+    aRRofSSBs=13,
+    aRRofDMinElderly=1.5,
+    aRRofMortalityDM.over55=1.65, 
+    aRRofMortalityDM.under55=3.0)
+
   
-  #browser()
   base.case<-data.frame(ode(y=stocks, times=simtime, func = model, 
                     parms=auxs, method='euler'))
-  base.case$dmprev <- base.case$sDM/(base.case$sDM + base.case$sIGT + base.case$sNGT)*100
-  #qplot(x=time, y=(sDM/(sDM+sIGT+sNGT)*100), xlab = "Year", ylab="Diabetes Prevalence (%)", data=base.case) + geom_line()
 
-  ggplot(data=base.case, mapping=aes(x=time, y=dmprev)) + 
-    geom_smooth() +
-    labs(x="Years", y="Diabetes prevalence (%)")
-
-#############################################################
-# SENSITIVITY ANALYSIS
-#baseline mid values
-base.midpoints <- data.frame(mid.point=c(SSB.Campaign.base =-0.5, SSBperUnitCal.base=130, SSB.init.base=2, ImportsTourism.base=60, LocalTourism.base=15,
-                               ElasFVPrice.base=-.65, InitFVIntake.base=109.5, EffectFVPH.base=6.2, CalperFV.base=1, ElasUHFoods.base=-0.9,
-                               EffectUHPH.base=3.59, Elasticity.Bus.Fare.base=0.15, 
-                               EffectInfra.base=16, RRPACampaign.base=1.28, MortalityNGTrate.under50.base=7.6, MortalityNGTrate.over50.base=48.7,
-                               IGTincidenceNO.base=4.5, RRofIGTinObese.base=1.5, IGTrecovery.base=10, DMincidenceNO.base=9, RRofDMinObese.base=1.6,
-                               RRofSSBs.base=13, RRofDMinElderly.base=1.5, RRofMortalityDM.over50.base=1.65, RRofMortalityDM.under50.base=3.0))
-
-rownames(base.midpoints) <- c("aEffectSSB.Campaign", "aSSBperUnitCal", "aSSB.init", "aImportsTourism", "aLocalTourism", "aElasFVPrice", 
-                          "aInitFVIntake", "aEffectFVPH", "aCalperFV", "aElasUHFoods", "aEffectUHPH", "aElasticity.Bus.Fare", "aEffectInfra", 
-                          "aRRPACampaign", "aMortalityNGTrate.under50", "aMortalityNGTrate.over50", "aIGTincidenceNO", "aRRofIGTinObese", 
-                          "aIGTrecovery", "aDMincidenceNO", "aRRofDMinObese", "aRRofSSBs", "aRRofDMinElderly", "aRRofMortalityDM.over50",
-                          "aRRofMortalityDM.under50")
   
-#min and max for Latin Hypercube sampling
+### Physical activity interventions
+  
+  auxs <- c(aInterventionYear=2020,
+                    
+                    #interventions
+                    aSSBPriceChange=0, #intervention point
+                    aIncreaseinFV=0, #intervention point for increase in production as a percentage
+                    aPriceChangeFV=0,#intervention point change as a percentage (+ for increase, - for decrease)
+                    aPriceChangeUH=0,#intervention point change as a percentage
+                    aFVPH.switch=0, #set to 1 for intervention, fruit and veg consumption PH campaign
+                    aUHPH.switch=0, #set to 1 for intervention, traffic light labeling of food
+                    aInfra.switch=1, #change to 1 for intervention, infrastructure for active transport
+                    aPublic.switch=1, #change to 1 for interventions to increase public transportation
+                    aPAPH.Campaign=1, #change to 1 for intervention, PA awareness campaign
+                    
+                    #ssb assumptions
+                    aElasticity.SSB=-1.3,
+                    aEffectSSB.Campaign=-0.5,
+                    aSSBperUnitCal=130,
+                    
+                    #Calories from food assumptions
+                    aImportsTourism=60,
+                    aLocalTourism=15,
+                    aElasFVPrice=-.65,
+                    aUHFVCrossPrice=0.07,
+                    aInitFVIntake=73,
+                    aEffectFVPH=6.2,
+                    aCalperFV=1,
+                    aElasUHFoods=-0.09,
+                    aEffectUHPH=-3.59,#traffic light system of food labeling
+                    
+                    #Physical activity calories
+                    aPublic.Transport=4.3, # min/day added from better public transport
+                    aEffectInfra=16, 
+                    aRRPACampaign=1.28, 
+                    aMETsMVPA=4.0,
+                    
+                    #Obesity
+                    aFracCalDigestion=0.1,
+                    aAvgHeight=1.65,
+                    
+                    #Core model
+                    aMortalityNGTrate.under55=2,
+                    aMortalityNGTrate.over55=32,
+                    aIGTincidenceNO=24,
+                    aRRofIGTinObese=1.32,
+                    aIGTrecovery=10, 
+                    aDMincidenceNO=35,
+                    aRRofDMinObese=2.3,
+                    aRRofSSBs=13,
+                    aRRofDMinElderly=1.5,
+                    aRRofMortalityDM.over55=1.65, 
+                    aRRofMortalityDM.under55=3.0)
 
-UHF.PH.min=-8.9; UHF.PH.max=1.72; #traffic light system
-Elas.bus.fare.min=-0.3; Elas.bus.fare.max=-0.65;
-#Work.init.min=1; Work.init.max=1440.5;
-#Travel.init.min=1; Travel.init.max=557;
-#LT.init.min=2; LT.init.max=480;
-Effect.infra.min=0; Effect.infra.max=25;
-RRPA.min=1.03; RRPA.max=1.3;
-MortalityNGTrate.under50.min= 6.6; MortalityNGTrate.under50.max= 8.0; #range from NHANES paper for non-diabetic, black population
-MortalityNGTrate.over50.min= 39.05; MortalityNGTrate.over50.max= 58.35;#range from NHANES
-IGT.incidence.min=3.0; IGT.incidence.max=6.0;
-RR.IGT.Obese.min=1.5; RR.IGT.Obese.max=2.0;
-IGT.recovery.min=5; IGT.recovery.max=15;
-DM.incidence.NO.min=5; DM.incidence.NO.max=12; #no data from the DPP on confidence intervals
-RR.DM.Obese.min=1.2; RR.DM.Obese.max=5.0; #no data from DPP on confidence, 1.6 for those with IGT; maybe better to use nurse's health values
-RR.SSBs.min=6; RR.SSBs.max=21; #Fumiaki
-RR.DM.Elderly.min=1.0; RR.DM.Elderly.max=1.8; #not sure this is necessary
-RR.Mortality.DM.Over50.min=1.4; RR.Mortality.DM.Over50.max=2.6; #unwin and roglic from NHANES
-RR.Mortality.DM.Under50.min=2.0; RR.Mortality.DM.Under50.max=4.6; #unwin and roglic from NHANES
+  pa.case<-data.frame(ode(y=stocks, times=simtime, func = model, 
+                            parms=auxs, method='euler'))
 
-parRange <- data.frame(
-  min=c(SSB.Camp.min=-1.299, SSB.per.unit.min=110, SSB.init.min=1.2, Imports.Tourism.min=50, Local.Tourism.min=10, Elas.FV.min=-0.71,
-        Init.FV.min=247.8, FV.PH.min=11.24, Cal.per.FV.min=0.95, Elas.UHF.min=-6, UHF.PH.min, Elas.bus.fare.min, 
-        Effect.infra.min, RRPA.min, MortalityNGTrate.under50.min,
-        MortalityNGTrate.over50.min, IGT.incidence.min, RR.IGT.Obese.min, IGT.recovery.min,
-        DM.incidence.NO.min, RR.DM.Obese.min, RR.SSBs.min, RR.DM.Elderly.min, RR.Mortality.DM.Over50.min,
-        RR.Mortality.DM.Under50.min),
-  max=c(SSB.Camp.max=1.089, SSB.per.unit.max=150, SSB.init.max=3.0, Imports.Tourism.max=70, Local.Tourism.max=20, Elas.FV.max=-0.59,
-        Init.FV.max=376.5, FV.PH.max=24.66, Cal.per.FV.max=1.05, Elas.UHF.max=-12, UHF.PH.max, Elas.bus.fare.max,  Effect.infra.max, RRPA.max, MortalityNGTrate.under50.max, 
-        MortalityNGTrate.over50.max, IGT.incidence.max, RR.IGT.Obese.max, IGT.recovery.max,
-        DM.incidence.NO.max, RR.DM.Obese.max, RR.SSBs.max, RR.DM.Elderly.max, RR.Mortality.DM.Over50.max,
-        RR.Mortality.DM.Under50.max))
 
-rownames(parRange) <- c("aEffectSSB.Campaign", "aSSBperUnitCal", "aSSB.init", 
-                        "aImportsTourism", "aLocalTourism", "aElasFVPrice", 
-                        "aInitFVIntake", "aEffectFVPH", "aCalperFV", "aElasUHFoods", "aEffectUHPH",
-                        "aElasticity.Bus.Fare", "aEffectInfra", 
-                        "aRRPACampaign", "aMortalityNGTrate.under50", "aMortalityNGTrate.over50",
-                        "aIGTincidenceNO", "aRRofIGTinObese", "aIGTrecovery", "aDMincidenceNO",
-                        "aRRofDMinObese", "aRRofSSBs", "aRRofDMinElderly", "aRRofMortalityDM.over50",
-                        "aRRofMortalityDM.under50")
-
+ ## Food system interventions
  
-## define function for sensitivity run
-sensRun <- function(x){
-  
-  g.SimsRuns <<-list(length=nrow(x))
-  
-  for (i in 1:nrow(x)){
-    #init <- p[i, "xyz"]
-    
-    auxs <- c(aInterventionYear=2020,
-              aElasticity.SSB=-1.3,
-              aSSBPriceChange=0,
-              aIncreaseinFV=0,
-              aPriceChangeFV=0,#intervention point
-              aPriceChangeUH=0,#intervention point
-              aUHFVCrossPrice=0.07,
-              aFVPH.switch=0, #set to 1 for intervention
-              aUHPH.switch=0, #set to 1 for intervention
-              aOtherIntake=2100, 
-              aChange.in.Bus.Fare=0,#intervention point
-              aInfra.switch=0, #change to 1 for intervention
-              aPAPH.Campaign=0, #change to 1 for intervention
-              aMETsMVPA=4.0,
-              aFatFrac=0.3,
-              aFracCalDigestion=0.1,
-              aAvgHeight=1.65, p[i, 1:28])
-    
-    stocks <- c(sNGT=1270*95,
-                sIGT=1270*0.03,
-                sDM=1270*0.02,
-                sAvgBdWt=71.7,
-                sFV=250)
-    
-    o<-data.frame(ode(y=stocks, times=simtime, func = model, 
-                      parms=auxs, method='euler'))
-    o$run <- i
-    g.SimsRuns[[i]] <<- o
-  }
-}
+ auxs <- c(aInterventionYear=2020,
+           
+           #interventions
+           aSSBPriceChange=20, #intervention point
+           aIncreaseinFV=5, #intervention point for increase in production as a percentage
+           aPriceChangeFV=-10,#intervention point change as a percentage (+ for increase, - for decrease)
+           aPriceChangeUH=10,#intervention point change as a percentage
+           aFVPH.switch=1, #set to 1 for intervention, fruit and veg consumption PH campaign
+           aUHPH.switch=1, #set to 1 for intervention, traffic light labeling of food
+           aInfra.switch=0, #change to 1 for intervention, infrastructure for active transport
+           aPublic.switch=0, #change to 1 for interventions to increase public transportation
+           aPAPH.Campaign=0, #change to 1 for intervention, PA awareness campaign
+           
+           #ssb assumptions
+           aElasticity.SSB=-1.3,
+           aEffectSSB.Campaign=-0.5,
+           aSSBperUnitCal=130,
+           
+           #Calories from food assumptions
+           aImportsTourism=60,
+           aLocalTourism=15,
+           aElasFVPrice=-.65,
+           aUHFVCrossPrice=0.07,
+           aInitFVIntake=73,
+           aEffectFVPH=6.2,
+           aCalperFV=1,
+           aElasUHFoods=-0.09,
+           aEffectUHPH=-3.59,#traffic light system of food labeling
+           
+           #Physical activity calories
+           aPublic.Transport=4.3, # min/day added from better public transport
+           aEffectInfra=16, 
+           aRRPACampaign=1.28, 
+           aMETsMVPA=4.0,
+           
+           #Obesity
+           aFracCalDigestion=0.1,
+           aAvgHeight=1.65,
+           
+           #Core model
+           aMortalityNGTrate.under55=2,
+           aMortalityNGTrate.over55=32,
+           aIGTincidenceNO=20,
+           aRRofIGTinObese=1.32,
+           aIGTrecovery=10, 
+           aDMincidenceNO=35,
+           aRRofDMinObese=2.3,
+           aRRofSSBs=13,
+           aRRofDMinElderly=1.5,
+           aRRofMortalityDM.over55=1.65, 
+           aRRofMortalityDM.under55=3.0)
+ 
+ food.case<-data.frame(ode(y=stocks, times=simtime, func = model, 
+                         parms=auxs, method='euler'))
+ 
+ 
+ ## upstream
+ auxs <- c(aInterventionYear=2020,
+           
+           #interventions
+           aSSBPriceChange=20, #intervention point
+           aIncreaseinFV=5, #intervention point for increase in production as a percentage
+           aPriceChangeFV=-10,#intervention point change as a percentage (+ for increase, - for decrease)
+           aPriceChangeUH=10,#intervention point change as a percentage
+           aFVPH.switch=1, #set to 1 for intervention, fruit and veg consumption PH campaign
+           aUHPH.switch=1, #set to 1 for intervention, traffic light labeling of food
+           aInfra.switch=1, #change to 1 for intervention, infrastructure for active transport
+           aPublic.switch=1, #change to 1 for interventions to increase public transportation
+           aPAPH.Campaign=1, #change to 1 for intervention, PA awareness campaign
+           
+           #ssb assumptions
+           aElasticity.SSB=-1.3,
+           aEffectSSB.Campaign=-0.5,
+           aSSBperUnitCal=130,
+           
+           #Calories from food assumptions
+           aImportsTourism=60,
+           aLocalTourism=15,
+           aElasFVPrice=-.65,
+           aUHFVCrossPrice=0.07,
+           aInitFVIntake=73,
+           aEffectFVPH=6.2,
+           aCalperFV=1,
+           aElasUHFoods=-0.09,
+           aEffectUHPH=-3.59,#traffic light system of food labeling
+           
+           #Physical activity calories
+           aPublic.Transport=4.3, # min/day added from better public transport
+           aEffectInfra=16, 
+           aRRPACampaign=1.28, 
+           aMETsMVPA=4.0,
+           
+           #Obesity
+           aFracCalDigestion=0.1,
+           aAvgHeight=1.65,
+           
+           #Core model
+           aMortalityNGTrate.under55=2,
+           aMortalityNGTrate.over55=32,
+           aIGTincidenceNO=20,
+           aRRofIGTinObese=1.32,
+           aIGTrecovery=10, 
+           aDMincidenceNO=35,
+           aRRofDMinObese=2.3,
+           aRRofSSBs=13,
+           aRRofDMinElderly=1.5,
+           aRRofMortalityDM.over55=1.65, 
+           aRRofMortalityDM.under55=3.0)
+ 
+ upstream.combo.case<-data.frame(ode(y=stocks, times=simtime, func = model, 
+                           parms=auxs, method='euler'))
 
-#create random parameter estimates within ranges for sensitivity - latin hypercube
-p <- data.frame(Latinhyper(parRange, 100)) #need to determine number of runs
 
-#univariate sensitivity
+# healthcare only
+## Need to modify the time of running the model to be able to intervene with changes 
+ # in RR for mortality and Pre-DM recovery
+
+ ## healthcare
+ # Set up simulation and time step #
+ START<-2020; FINISH<-2050; STEP<-1
+ 
+ # Create time vector
+ simtime <- seq(START, FINISH, by=STEP)
+ 
+ # Create stock and auxs
+ stocks <- c(sNGT=base.case$sNGT[base.case$time == 2020],
+             sIGT=base.case$sIGT[base.case$time == 2020],
+             sDM=base.case$sDM[base.case$time ==2020],
+             sAvgBdWt=base.case$sAvgBdWt[base.case$time == 2020],
+             sFV=base.case$sFV[base.case$time == 2020])
+ 
+  auxs <- c(aInterventionYear=2020,
+          
+          #interventions
+          aSSBPriceChange=0, #intervention point
+          aIncreaseinFV=0, #intervention point for increase in production as a percentage
+          aPriceChangeFV=0,#intervention point change as a percentage (+ for increase, - for decrease)
+          aPriceChangeUH=0,#intervention point change as a percentage
+          aFVPH.switch=0, #set to 1 for intervention, fruit and veg consumption PH campaign
+          aUHPH.switch=0, #set to 1 for intervention, traffic light labeling of food
+          aInfra.switch=0, #change to 1 for intervention, infrastructure for active transport
+          aPublic.switch=0, #change to 1 for interventions to increase public transportation
+          aPAPH.Campaign=0, #change to 1 for intervention, PA awareness campaign
+          
+          #ssb assumptions
+          aElasticity.SSB=-1.3,
+          aEffectSSB.Campaign=-0.5,
+          aSSBperUnitCal=130,
+          
+          #Calories from food assumptions
+          aImportsTourism=60,
+          aLocalTourism=15,
+          aElasFVPrice=-.65,
+          aUHFVCrossPrice=0.07,
+          aInitFVIntake=73,
+          aEffectFVPH=6.2,
+          aCalperFV=1,
+          aElasUHFoods=-0.09,
+          aEffectUHPH=-3.59,#traffic light system of food labeling
+          
+          #Physical activity calories
+          aPublic.Transport=4.3, # min/day added from better public transport
+          aEffectInfra=16, 
+          aRRPACampaign=1.28, 
+          aMETsMVPA=4.0,
+          
+          #Obesity
+          aFracCalDigestion=0.1,
+          aAvgHeight=1.65,
+          
+          #Core model
+          aMortalityNGTrate.under55=2,
+          aMortalityNGTrate.over55=32,
+          aIGTincidenceNO=20,
+          aRRofIGTinObese=1.32,
+          aIGTrecovery=12, #base is 10, increase to 12 for high-risk approach 
+          aDMincidenceNO=35,
+          aRRofDMinObese=2.3,
+          aRRofSSBs=13,
+          aRRofDMinElderly=1.5,
+          aRRofMortalityDM.over55=1.32,#reduction in RR mortality of PWD by 20 percent
+          aRRofMortalityDM.under55=2.4)
+
+healthcare.case<-data.frame(ode(y=stocks, times=simtime, func = model, 
+                                    parms=auxs, method='euler'))
 
 
+intervention.case.plot <- ggplot() +
+  geom_line(data=pa.case[pa.case$time %in% c(2020:2050),], aes(x=time, y=dmprev, color='PA only')) +
+  geom_line(data=food.case[food.case$time %in% c(2020:2050),],  aes(x=time, y=dmprev, color='Food system only')) +
+  geom_line(data=upstream.combo.case[upstream.combo.case$time %in% c(2020:2050),],  aes(x=time, y=dmprev, color='Upstream combined')) +
+  geom_line(data=healthcare.case,  aes(x=time, y=dmprev, color='Health system')) +
+  geom_line(data=base.case[base.case$time %in% c(2020:2050),],  aes(x=time, y=dmprev, color='Baseline')) +
+  labs(x="Year", y="Diabetes prevalence (%)", color = 'Scenarios', title = "Effects of intervention strategies on diabetes prevalence")
+intervention.case.plot
+
+intervention.incidence.plot <- ggplot() +
+  geom_line(data=pa.case[pa.case$time %in% c(2020:2050),], aes(x=time, y=DMOnset, color='PA only')) +
+  geom_line(data=food.case[food.case$time %in% c(2020:2050),],  aes(x=time, y=DMOnset, color='Food system only')) +
+  geom_line(data=upstream.combo.case[upstream.combo.case$time %in% c(2020:2050),],  aes(x=time, y=DMOnset, color='Upstream combined')) +
+  geom_line(data=healthcare.case,  aes(x=time, y=DMOnset, color='Health system')) +
+  geom_line(data=base.case[base.case$time %in% c(2020:2050),],  aes(x=time, y=DMOnset, color='Baseline')) +
+  labs(x="Year", y="Diabetes new cases (in 1000s)", color = 'Scenarios', title = "Effects of intervention strategies new diabetes cases")
+intervention.incidence.plot
 
 
-#multivariate sensitivity
-sensRun(p)
+intervention.deaths.plot <- ggplot() +
+  geom_line(data=pa.case[pa.case$time %in% c(2020:2050),], aes(x=time, y=DMMortality, color='PA only')) +
+  geom_line(data=food.case[food.case$time %in% c(2020:2050),],  aes(x=time, y=DMMortality, color='Food system only')) +
+  geom_line(data=upstream.combo.case[upstream.combo.case$time %in% c(2020:2050),],  aes(x=time, y=DMMortality, color='Upstream combined')) +
+  geom_line(data=healthcare.case,  aes(x=time, y=DMMortality, color='Health system')) +
+  geom_line(data=base.case[base.case$time %in% c(2020:2050),],  aes(x=time, y=DMMortality, color='Baseline')) +
+  labs(x="Year", y="Deaths in PWD in 1000s)", color = 'Scenarios', title = "Effects of intervention strategies on deaths in PWD")
+intervention.deaths.plot
 
-#set the time parameters for the simulation of sensitivity
-START<-2020; FINISH<-2050; STEP<-1
 
-# Create time vector
-simtime <- seq(START, FINISH, by=STEP)
-library(plyr)
-df<-rbind.fill(g.SimsRuns)
-
-p1 <- ggplot(df, aes(x=time, y=(sDM/(sDM+sIGT+sNGT)*100), color=run, group=run)) +
-  geom_line()
-
+intervention.obesity.plot <- ggplot() +
+  geom_line(data=pa.case[pa.case$time %in% c(2020:2050),], aes(x=time, y=Obesity, color='PA only')) +
+  geom_line(data=food.case[food.case$time %in% c(2020:2050),],  aes(x=time, y=Obesity, color='Food system only')) +
+  geom_line(data=upstream.combo.case[upstream.combo.case$time %in% c(2020:2050),],  aes(x=time, y=Obesity, color='Upstream combined')) +
+  geom_line(data=healthcare.case,  aes(x=time, y=Obesity, color='Health system')) +
+  geom_line(data=base.case[base.case$time %in% c(2020:2050),],  aes(x=time, y=Obesity, color='Baseline')) +
+  labs(x="Year", y="Obesity prevalence (%)", color = 'Scenarios', title = "Effects of intervention strategies on obesity prevalence")
+intervention.obesity.plot

@@ -51,12 +51,6 @@ server <- function(input, output) {
                  aFraction.Bus.Use=5, # portion of people moving from car to bus - should start neg and go pos
                  aElasticity.Bus.Fare=0.15,
                  aChange.in.Bus.Fare=0,#intervention point
-                 aWork.init=200,
-                 aWork.decline=0.03,
-                 aTravel.init=60,
-                 aTravel.decline=0.017,
-                 aLT.init=15,
-                 aLT.change=0.019,
                  aEffectInfra=0.05, #scenario
                  aRRPACampaign=1.15, #scenario
                  aMETsMVPA=4.0,
@@ -64,16 +58,16 @@ server <- function(input, output) {
                  #Obesity
                  aFatFrac=0.3,
                  aFracCalDigestion=0.1,
-                 aAvgHeight=1.69,
+                 aAvgHeight=1.65,
                  
                  #Core model
-                 aMortalityNGTrate.under50=7.6,
-                 aMortalityNGTrate.over50=48.7,
-                 aIGTincidenceNO=1.2,
-                 aRRofIGTinObese=1.7,
+                 aMortalityNGTrate.under50=0.155,
+                 aMortalityNGTrate.over50=7.5,
+                 aIGTincidenceNO=2,
+                 aRRofIGTinObese=1.3,
                  aIGTrecovery=10,
-                 aDMincidenceNO=9,
-                 aRRofDMinObese=1.6,
+                 aDMincidenceNO=6,
+                 aRRofDMinObese=2.3,
                  aRRofSSBs=13,
                  aRRofDMinElderly=1.5,
                  aRRofMortalityDM.Over50=1.65,
