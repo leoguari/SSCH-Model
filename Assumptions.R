@@ -7,13 +7,21 @@ aInterventionYear <- 2020
 #Assuming a baseline share of prev of DM in adults 2%, IGT 5%, 93% NGT
 Baseline.Pop <- 1317 #in 1000s so 1.9 million is baseline
 Baseline.IGT <- .07*Baseline.Pop
-Baseline.DM <- .03*Baseline.Pop
+Baseline.DM <- .035*Baseline.Pop
 Baseline.NGT <- Baseline.Pop - (Baseline.IGT + Baseline.DM)
-aInitAvgWt <- 72 #men 71, women 73
 aInitFVStock <- 250
+aInitAvgWt.M <- 70
+aInitAvgWt.W <- 71
 per.women <-52
 per.men <- 48
 BMI.ratio <- 1.17
+
+# average age from WPP
+age.m <- c(40.7, 41.0, 41.9, 42.5, 42.8, 42.9, 43.4, 44.4, 45.5, 46.5, 47.5, 48.5, 49.4)
+aAvgAge.M <- approxfun(years, age.m)
+
+age.w <- c(41.5, 41.6, 42.2, 43.0, 43.3, 43.5, 44.1, 45.2, 46.5, 47.7, 48.8, 49.9, 51.0)
+aAvgAge.W <-  approxfun(years, age.w)
 
 #Functions for the model
 #Estimating the RR reduction in DM from PA
@@ -55,29 +63,20 @@ Fract.Over55 <- c(23.23, 23.12, 22.86, 22.79, 22.38, 22.32, 22.33,
                   39.00, 39.64, 40.31, 41.00, 41.64)
 over.55 <- approxfun(years.all, Fract.Over55)
 
-##Estimating obesity prevalence from average population BMI - NOT USING THIS ANYMORE
-# BMI <- c(20:35)
-# Ob.prev <- c(0, 0, 0, 0.03, 0.09, 0.1495, 0.2097, 0.2699, 0.3301, 0.3903,
-#              0.4505, 0.5107, 0.5709, 0.6311, 0.6913, 0.7515)
-# Obesity.fraction.calc <- approxfun(BMI, Ob.prev)
-
-#estimating the number of unhealthy calories per year
-UHCalories <- c(199.9, 204, 208.1, 212.4, 216.7, 221.1,
-                225.6, 230.2, 234.9, 239.7, 244.6, 249.6,
-                254.7, 259.9, 265.2, 270.6, 276.1, 281.8,
-                287.5, 293.4, 300.1, 305.1, 309.7, 312.8, 
-                317.7, 321.8, 327.8, 333.9, 340.6, 346.8,
-                353.7, 360.8, 368, 375.3, 382.8, 390.5, 398.3,
-                406.3, 414.4, 422.7, 431.1, 439.8, 448.6, 457.5,
-                466.7, 476, 485.5, 495.2, 505.2, 515.3, 525.6,
-                536.1, 546.8, 557.7, 568.9, 580.3, 591.9, 603.7,
-                615.8,  628.1, 640.7)
+UHCalories <- c(239.88, 244.8, 249.72, 254.88, 260.04, 265.32, 270.72,
+                276.24, 281.88, 287.64, 293.52, 299.52, 305.64, 311.88,
+                318.24, 324.72, 331.32, 338.16, 345, 352.08, 360.12,
+                366.12, 371.64, 375.36, 381.24, 386.16, 393.36, 400.68,
+                408.72, 416.16, 424.44, 432.96, 441.6, 450.36, 459.36, 468.6,
+                477.96, 487.56, 497.28, 507.24, 517.32, 527.76, 538.32, 549,
+                560.04, 571.2, 582.6, 594.24, 606.24, 618.36, 630.72, 643.32,
+                656.16, 669.24, 682.68, 696.36, 710.28, 724.44, 738.96, 753.72,
+                768.84)
 ffUHCalories <- approxfun(years.all, UHCalories)
 
 #estimating calories from other food sources
-OtherIntake <- c(1914, 1952, 1982, 2030, 2079, 2101, 2131, 2173, 2221,
-                 2263, 2302, 2341, 2380)
-ffOtherIntake <- approxfun(years, OtherIntake)
+OtherIntake <- 1550
+#ffOtherIntake <- approxfun(years.all, OtherIntake)
 
 #exports of Fruits and Vegetables from Jamaica Agriculture database
 FVExport.full <- c(14000000, 14387875, 17329309, 18232364, 18250000,
@@ -129,45 +128,57 @@ InitialFVProduction.Full <- c(503976, 511753, 511753, 519531, 527309, 542865,
                           690642)
 ffInitialFVProduction <- approxfun(years.all, InitialFVProduction.Full)
 ## baseline SSB consumption
-SSB.trend <- c(1.5, 2.0, 2.5, 3.5)
-ffSSB <- approxfun(c(1990, 2005, 2020, 2050), SSB.trend)
+SSB.trend <- c(2.0, 2.1, 2.1, 2.1, 2.1, 2.2, 2.2)
+ffSSB <- approxfun(c(1990, 1995, 2000, 2005, 2010, 2015, 2050), SSB.trend)
 
-
-## PHYSICAL ACTIVITY
-#chart for fraction of people moving from car to bus
-# bus.to.car <- c(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, -2, -2, -2, -3, -3,
-#                 -3, -4, -4, -4, -4, -4, -4, -4, -4, -4, -4, -3, -2, -1,
-#                 -1, -1, 0, 1, 1, 2, 3, 3, 3, 4, 5, 5, 5, 6, 7, 8, 8, 9, 9,
-#                 9, 10, 10, 11, 11, 13, 13, 13, 14, 14, 15, 16)
-# ffbus.to.car <- approxfun(years.all, bus.to.car)
-# #Physical activity - function for bus use contributing to minutes in MVPA
-# Bus.Minutes.Function <- c(0, 10)
-# bus.users <- c(0, 100)
-# ffBusMinutes.calc <- approxfun(bus.users, Bus.Minutes.Function, yleft=0)
 
 ##Occupational MVPA decline function
 #assuming an annualized reduction in occupational PA of 1.2% from Ng and Popkin and initial occupational MVPA of 50 min per day
-Initial.Work <- 75
-Work.MVPA.Function <- c(Initial.Work, 32.31)
-ff.work.mvpa <- approxfun(c(1990, 2050), Work.MVPA.Function)
-ff.work.mvpa.stable <- 75
+Work.MVPA.Function <- c(45, 44.3, 43.7, 43, 42.4, 41.7, 41.1,
+                        40.5, 39.9, 39.3, 38.7, 38.1, 37.5,
+                        37, 36.4, 35.9, 35.3, 34.8, 34.3, 33.8,
+                        33.3, 32.8, 32.3, 31.8, 31.3, 30.8, 30.4,
+                        29.9, 29.5, 29, 28.6, 28.2, 27.7, 27.3, 26.9,
+                        26.5, 26.1, 25.7, 25.3, 25, 24.6, 24.2, 23.9,
+                        23.5, 23.1, 22.8, 22.5, 22.1, 21.8, 21.5, 21.1,
+                        20.8, 20.5, 20.2, 19.9, 19.6, 19.3, 19, 18.7, 18.4, 18.2)
+ff.work.mvpa <- approxfun(years.all, Work.MVPA.Function)
+ff.work.mvpa.stable <- 45
 
 ##Travel MVPA decline function
-Initial.Travel <- 17.5
-Travel.MVPA.Function <- c(Initial.Travel, 7.5)
-ff.travel.mvpa <- approxfun(c(1990, 2050), Travel.MVPA.Function)
-ff.travel.mvpa.stable <- 17.5
+Travel.MVPA.Function <- c(15, 14.7, 14.5, 14.2, 14, 13.8, 13.5, 13.3, 13.1,
+                          12.9, 12.6, 12.4, 12.2, 12, 11.8, 11.6, 11.4, 11.2,
+                          11, 10.8, 10.6, 10.5, 10.3, 10.1, 9.9, 9.8, 9.6,
+                          9.4, 9.3, 9.1, 9, 8.8, 8.7, 8.5, 8.4, 8.2, 8.1,
+                          8, 7.8, 7.7, 7.6, 7.4, 7.3, 7.2, 7.1, 6.9, 6.8,
+                          6.7, 6.6, 6.5, 6.4, 6.3, 6.1, 6, 5.9, 5.8, 5.7,
+                          5.6, 5.5,5.5, 5.4)
+ff.travel.mvpa <- approxfun(years.all, Travel.MVPA.Function)
+ff.travel.mvpa.stable <- 15
 
 #Leisure MVPA decline function
-Initial.Leisure <- 5
-Leisure.MVPA.Function <- c(Initial.Leisure, 12.9)
-ff.leisure.mvpa <- approxfun(c(1990, 2050), Leisure.MVPA.Function)
+Leisure.MVPA.Function <- c(5, 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 5.7, 5.9,
+                           6, 6.1, 6.2, 6.3, 6.5, 6.6, 6.7, 6.9, 7,
+                           7.1, 7.3, 7.4, 7.6, 7.7, 7.9, 8, 8.2, 8.4,
+                           8.5, 8.7, 8.9, 9.1, 9.2, 9.4, 9.6, 9.8,
+                           10, 10.2, 10.4, 10.6, 10.8, 11, 11.3, 11.5,
+                           11.7, 12, 12.2, 12.4, 12.7, 12.9, 13.2,
+                           13.5, 13.7, 14, 14.3, 14.6, 14.9, 15.2, 15.5,
+                           15.8, 16.1, 16.4)
+ff.leisure.mvpa <- approxfun(years.all, Leisure.MVPA.Function)
 ff.leisure.mvpa.stable <- 5
 
 #Domestic MVPA decline function
-Initial.Domestic <- 25
-Domestic.MVPA.Function <- c(Initial.Domestic, 8.5)
-ff.domestic.mvpa <- approxfun(c(1990, 2050), Domestic.MVPA.Function)
+Domestic.MVPA.Function <- c(25, 24.6, 24.2, 23.9, 23.5, 23.1,
+                            22.8, 22.4, 22.1, 21.7, 21.4, 21.1,
+                            20.8, 20.4, 20.1, 19.8, 19.5, 19.2,
+                            18.9, 18.6, 18.3, 18.1, 17.8, 17.5,
+                            17.2, 17, 16.7, 16.5, 16.2, 16, 15.7,
+                            15.5, 15.2, 15, 14.8, 14.5, 14.3, 14.1,
+                            13.9, 13.7, 13.5, 13.3, 13.1, 12.9, 12.7,
+                            12.5, 12.3, 12.1, 11.9, 11.7, 11.5, 11.4,
+                            11.2, 11, 10.8, 10.7, 10.5, 10.3, 10.2, 10, 9.9)
+ff.domestic.mvpa <- approxfun(years.all, Domestic.MVPA.Function)
 ff.domestic.mvpa.stable <- 25
 
 ## Effect of LTPA on diabetes onset function
@@ -175,4 +186,5 @@ LTPA.RR <- c(1, 0.99, 0.93, 0.87, 0.76, 0.74, 0.64, 0.47)
 minutes.LT <- c(0, 1, 2, 4, 10, 11, 22, 60)
 
 ff.LTPA.RR <- approxfun(minutes.LT, LTPA.RR)
+
 

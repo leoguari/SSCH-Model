@@ -1,4 +1,4 @@
-### System Science for Carribean Health Model of Diabetes ###
+### System Science for Caribbean Health Model of Diabetes ###
 
 # load necessary packages #
 library(deSolve)
@@ -73,8 +73,11 @@ model <- function(time, stocks, auxs){
     aUHFoods <- ffUHCalories(time) + (ffUHCalories(time)*aEffectUHTax/100) + 
       (ffUHCalories(time)*(aEffectUHPH/100)*ffUHPH(time))
     
-    aDailyIntake <- aUHFoods + aFVkcalperday + ffOtherIntake(time) + aCaloriesSSB
-  
+    aDailyIntake.Total <- aUHFoods + aFVkcalperday + OtherIntake + aCaloriesSSB
+    Ratio.Intake <- 1.17 #ratio of calorie intake in Men to Women
+    aDailyIntake.W <- aDailyIntake.Total/((per.women/100) + (per.men/100)*Ratio.Intake)
+    aDailyIntake.M <- aDailyIntake.W*Ratio.Intake
+    
     #Fruit and vegetable stock equation
     dFV_dt <-  fFVSupply - fFVWaste - fFVExport - fFVConsumption
     
@@ -99,23 +102,57 @@ model <- function(time, stocks, auxs){
     ffPA.campaign <- approxfun(years.all, PA.campaign)
     
     aTotalMVPA <- aTotalMVPA.noPH + (aRRPACampaign-1)*(aTotalMVPA.noPH)*ffPA.campaign(time)
-    aTotalMETs <- aTotalMVPA*aMETsMVPA
-    aDailyCalBurned <- (aTotalMETs*3.5*sAvgBdWt)/200
+    Ratio.PA <- 3.5
+    aMVPA.W <- aTotalMVPA/(per.women/100 + per.men/100*Ratio.PA)
+    aMVPA.M <- aMVPA.W * Ratio.PA
     
+    aActiveMets.W <- aMVPA.W*5.2
+    aActiveMets.M <- aMVPA.M*5.2
+    
+    Total.minutes <- 1440
+    Sleep.time <- 8*60
+    LightPA.time <- 6*60
+    SleepMets <- Sleep.time*0.95
+    LightPAMets <- LightPA.time*2
+    
+    Sedentary.T.W <- Total.minutes - aMVPA.W - Sleep.time - LightPA.time
+    SedentaryMets.W <- Sedentary.T.W*1.5
+    
+    Sedentary.T.M <- Total.minutes - aMVPA.M - Sleep.time - LightPA.time
+    SedentaryMets.M <- Sedentary.T.M*1.5
+    
+    aPAL.W <- (SedentaryMets.W + aActiveMets.W + SleepMets + LightPAMets)/Total.minutes
+    aPAL.M <-(SedentaryMets.M + aActiveMets.M + SleepMets + LightPAMets)/Total.minutes
+ 
+  
     ##Obesity module
-    aMod.BMI <- sAvgBdWt / (aAvgHeight^2)
-    BMI.M <- aMod.BMI/(per.men + per.women*BMI.ratio)*100
-    BMI.W <- BMI.ratio * BMI.M
-    aFatFrac.M <- ((3.76*BMI.M) - (0.04*BMI.M^2) - 47.8)/100
-    aFatFrac.W <- ((4.35*BMI.W) - (0.05*BMI.W^2) - 46.24)/100
-    aFatFrac <- (aFatFrac.W + aFatFrac.M)/2
-   
-    aBasalCalories <- (sAvgBdWt * (0.024 * aFatFrac + 0.102 * (1-aFatFrac)) + 0.85) * 238.7
-    aCaloricBalance <- aDailyIntake - aDailyCalBurned - aBasalCalories - (aFracCalDigestion * aDailyIntake)
-    aFracBalanceFat <- 1/(1 +((10.4/(sAvgBdWt*aFatFrac))*(4100/9300)))
-    fChange.wt <- aCaloricBalance * ((aFracBalanceFat/9300) + ((1-aFracBalanceFat)/4100))
-    dAvg.wt_dt <- fChange.wt
-    aObeseTotal <- 43 + -6.65*aMod.BMI + 0.233*aMod.BMI^2
+    # Men
+    aMod.BMI.M <- sAvgBdWt.M / (aAvgHeight.M^2)
+    #aFatFrac.M <- ((3.05*BMI.M) - (0.028*BMI.M^2) -36.61)/100
+
+    #Harris-Benedict
+    aBasalCalories.M <- 13.397*sAvgBdWt.M + 4.799*aAvgHeight.M - 5.677*aAvgAge.M(time) + 88.362
+    aTDEE.M <- aBasalCalories.M * aPAL.M
+    aCaloricBalance.M <- aDailyIntake.M - aTDEE.M
+    fChange.wt.M <- aCaloricBalance.M/8050
+    dAvg.wt_dt.M <- fChange.wt.M
+    aObeseTotal.M <- 146 + -15.1*aMod.BMI.M + 0.39*aMod.BMI.M^2
+    
+    #Women
+    aMod.BMI.W <- sAvgBdWt.W / (aAvgHeight.W^2)
+    #aFatFrac.W <- ((3.65*BMI.W) - (0.042*BMI.W^2) - 30.81)/100
+    #Harris-Benedict
+    aBasalCalories.W <- 447.593 + 9.247*sAvgBdWt.W + 3.098*aAvgHeight.W - 4.33*aAvgAge.W(time)
+    aTDEE.W <- aBasalCalories.W * aPAL.W
+    aCaloricBalance.W <- aDailyIntake.W - aTDEE.W
+    fChange.wt.W <- aCaloricBalance.W/8050
+    dAvg.wt_dt.W <- fChange.wt.W
+    aObeseTotal.W <- 28.6 + -5.6*aMod.BMI.W + 0.205*aMod.BMI.W^2
+    
+    aMod.BMI <- aMod.BMI.M*per.men/100 + aMod.BMI.W*per.women/100
+    
+    aObeseTotal <- 40.3 - 6.45*aMod.BMI + 0.219*aMod.BMI^2
+      
     aObesefractNGT <- aObeseTotal*0.8
     aObesefractIGT <- aObeseTotal*1.2
     
@@ -182,7 +219,7 @@ model <- function(time, stocks, auxs){
     dminc <- fDMOnset * 1000/(sIGT + sNGT)
     
     # All the results for the time step
-    ans <- list(c(dNGT_dt, dIGT_dt, dDM_dt, dAvg.wt_dt, dFV_dt),
+    ans <- list(c(dNGT_dt, dIGT_dt, dDM_dt, dAvg.wt_dt.M, dAvg.wt_dt.W, dFV_dt),
                 NGTOnset=fAdultGrowth,
                 NGTMortality=fNGTMortality,
                 NGTNetFlow=dNGT_dt,
@@ -192,15 +229,20 @@ model <- function(time, stocks, auxs){
                 DMOnset=fDMOnset,
                 DMMortality=fDMMortality,
                 DMNetFlow=dDM_dt,
-                BWtAvg=dAvg.wt_dt,
+                BWtAvg.M=dAvg.wt_dt.M,
+                BWtAvg.W=dAvg.wt_dt.W,
                 Obesity=aObeseTotal,
                 dmprev=dmprev,
-                dminc=dminc)
+                dminc=dminc,
+                PAL.W=aPAL.W,
+                Intake.W=aDailyIntake.W,
+                TDEE.W=aTDEE.W,
+                stock.bw.W=sAvgBdWt.W)
     
   })
 }
 
-#MODEL RUN
+#BASE CASE MODEL RUN
 
   # Set up simulation and time step #
   START<-1990; FINISH<-2050; STEP<-1
@@ -213,7 +255,8 @@ model <- function(time, stocks, auxs){
   stocks  <- c(sNGT=Baseline.NGT,
                sIGT=Baseline.IGT,
                sDM=Baseline.DM,
-               sAvgBdWt=aInitAvgWt,
+               sAvgBdWt.M=aInitAvgWt.M,
+               sAvgBdWt.W=aInitAvgWt.W,
                sFV=aInitFVStock) 
   
   auxs <- c(aInterventionYear=2020,
@@ -240,7 +283,7 @@ model <- function(time, stocks, auxs){
     aElasFVPrice=-.65,
     aUHFVCrossPrice=0.07,
     aInitFVIntake=73,
-    aEffectFVPH=6.2,
+    aEffectFVPH=3.59,
     aCalperFV=1,
     aElasUHFoods=-0.09,
     aEffectUHPH=-3.59,#traffic light system of food labeling
@@ -249,11 +292,12 @@ model <- function(time, stocks, auxs){
     aPublic.Transport=4.3, # min/day added from better public transport
     aEffectInfra=16, 
     aRRPACampaign=1.28, 
-    aMETsMVPA=4.0,
+    aMETsMVPA=5.2,
     
     #Obesity
-    aFracCalDigestion=0.1,
-    aAvgHeight=1.65,
+    aAvgHeight.M=1.72,
+    aAvgHeight.W=1.59,
+
     
     #Core model
     aMortalityNGTrate.under55=2,
@@ -272,175 +316,25 @@ model <- function(time, stocks, auxs){
   base.case<-data.frame(ode(y=stocks, times=simtime, func = model, 
                     parms=auxs, method='euler'))
 
+  # Set up simulation and time step #
+  START<-2020; FINISH<-2050; STEP<-1
   
-### Physical activity interventions
+  # Create time vector
+  simtime <- seq(START, FINISH, by=STEP)
   
-  auxs <- c(aInterventionYear=2020,
-                    
-                    #interventions
-                    aSSBPriceChange=0, #intervention point
-                    aIncreaseinFV=0, #intervention point for increase in production as a percentage
-                    aPriceChangeFV=0,#intervention point change as a percentage (+ for increase, - for decrease)
-                    aPriceChangeUH=0,#intervention point change as a percentage
-                    aFVPH.switch=0, #set to 1 for intervention, fruit and veg consumption PH campaign
-                    aUHPH.switch=0, #set to 1 for intervention, traffic light labeling of food
-                    aInfra.switch=1, #change to 1 for intervention, infrastructure for active transport
-                    aPublic.switch=1, #change to 1 for interventions to increase public transportation
-                    aPAPH.Campaign=1, #change to 1 for intervention, PA awareness campaign
-                    
-                    #ssb assumptions
-                    aElasticity.SSB=-1.3,
-                    aEffectSSB.Campaign=-0.5,
-                    aSSBperUnitCal=130,
-                    
-                    #Calories from food assumptions
-                    aImportsTourism=60,
-                    aLocalTourism=15,
-                    aElasFVPrice=-.65,
-                    aUHFVCrossPrice=0.07,
-                    aInitFVIntake=73,
-                    aEffectFVPH=6.2,
-                    aCalperFV=1,
-                    aElasUHFoods=-0.09,
-                    aEffectUHPH=-3.59,#traffic light system of food labeling
-                    
-                    #Physical activity calories
-                    aPublic.Transport=4.3, # min/day added from better public transport
-                    aEffectInfra=16, 
-                    aRRPACampaign=1.28, 
-                    aMETsMVPA=4.0,
-                    
-                    #Obesity
-                    aFracCalDigestion=0.1,
-                    aAvgHeight=1.65,
-                    
-                    #Core model
-                    aMortalityNGTrate.under55=2,
-                    aMortalityNGTrate.over55=32,
-                    aIGTincidenceNO=24,
-                    aRRofIGTinObese=1.32,
-                    aIGTrecovery=10, 
-                    aDMincidenceNO=35,
-                    aRRofDMinObese=2.3,
-                    aRRofSSBs=13,
-                    aRRofDMinElderly=1.5,
-                    aRRofMortalityDM.over55=1.65, 
-                    aRRofMortalityDM.under55=3.0)
-
-  pa.case<-data.frame(ode(y=stocks, times=simtime, func = model, 
+  # Create stock and auxs
+  stocks <- c(sNGT=base.case$sNGT[base.case$time == 2020],
+              sIGT=base.case$sIGT[base.case$time == 2020],
+              sDM=base.case$sDM[base.case$time ==2020],
+              sAvgBdWt=base.case$sAvgBdWt[base.case$time == 2020],
+              sFV=base.case$sFV[base.case$time == 2020])
+  
+ pa.case<-data.frame(ode(y=stocks, times=simtime, func = model, 
                             parms=auxs, method='euler'))
-
-
- ## Food system interventions
- 
- auxs <- c(aInterventionYear=2020,
-           
-           #interventions
-           aSSBPriceChange=20, #intervention point
-           aIncreaseinFV=5, #intervention point for increase in production as a percentage
-           aPriceChangeFV=-10,#intervention point change as a percentage (+ for increase, - for decrease)
-           aPriceChangeUH=10,#intervention point change as a percentage
-           aFVPH.switch=1, #set to 1 for intervention, fruit and veg consumption PH campaign
-           aUHPH.switch=1, #set to 1 for intervention, traffic light labeling of food
-           aInfra.switch=0, #change to 1 for intervention, infrastructure for active transport
-           aPublic.switch=0, #change to 1 for interventions to increase public transportation
-           aPAPH.Campaign=0, #change to 1 for intervention, PA awareness campaign
-           
-           #ssb assumptions
-           aElasticity.SSB=-1.3,
-           aEffectSSB.Campaign=-0.5,
-           aSSBperUnitCal=130,
-           
-           #Calories from food assumptions
-           aImportsTourism=60,
-           aLocalTourism=15,
-           aElasFVPrice=-.65,
-           aUHFVCrossPrice=0.07,
-           aInitFVIntake=73,
-           aEffectFVPH=6.2,
-           aCalperFV=1,
-           aElasUHFoods=-0.09,
-           aEffectUHPH=-3.59,#traffic light system of food labeling
-           
-           #Physical activity calories
-           aPublic.Transport=4.3, # min/day added from better public transport
-           aEffectInfra=16, 
-           aRRPACampaign=1.28, 
-           aMETsMVPA=4.0,
-           
-           #Obesity
-           aFracCalDigestion=0.1,
-           aAvgHeight=1.65,
-           
-           #Core model
-           aMortalityNGTrate.under55=2,
-           aMortalityNGTrate.over55=32,
-           aIGTincidenceNO=20,
-           aRRofIGTinObese=1.32,
-           aIGTrecovery=10, 
-           aDMincidenceNO=35,
-           aRRofDMinObese=2.3,
-           aRRofSSBs=13,
-           aRRofDMinElderly=1.5,
-           aRRofMortalityDM.over55=1.65, 
-           aRRofMortalityDM.under55=3.0)
  
  food.case<-data.frame(ode(y=stocks, times=simtime, func = model, 
                          parms=auxs, method='euler'))
  
- 
- ## upstream
- auxs <- c(aInterventionYear=2020,
-           
-           #interventions
-           aSSBPriceChange=20, #intervention point
-           aIncreaseinFV=5, #intervention point for increase in production as a percentage
-           aPriceChangeFV=-10,#intervention point change as a percentage (+ for increase, - for decrease)
-           aPriceChangeUH=10,#intervention point change as a percentage
-           aFVPH.switch=1, #set to 1 for intervention, fruit and veg consumption PH campaign
-           aUHPH.switch=1, #set to 1 for intervention, traffic light labeling of food
-           aInfra.switch=1, #change to 1 for intervention, infrastructure for active transport
-           aPublic.switch=1, #change to 1 for interventions to increase public transportation
-           aPAPH.Campaign=1, #change to 1 for intervention, PA awareness campaign
-           
-           #ssb assumptions
-           aElasticity.SSB=-1.3,
-           aEffectSSB.Campaign=-0.5,
-           aSSBperUnitCal=130,
-           
-           #Calories from food assumptions
-           aImportsTourism=60,
-           aLocalTourism=15,
-           aElasFVPrice=-.65,
-           aUHFVCrossPrice=0.07,
-           aInitFVIntake=73,
-           aEffectFVPH=6.2,
-           aCalperFV=1,
-           aElasUHFoods=-0.09,
-           aEffectUHPH=-3.59,#traffic light system of food labeling
-           
-           #Physical activity calories
-           aPublic.Transport=4.3, # min/day added from better public transport
-           aEffectInfra=16, 
-           aRRPACampaign=1.28, 
-           aMETsMVPA=4.0,
-           
-           #Obesity
-           aFracCalDigestion=0.1,
-           aAvgHeight=1.65,
-           
-           #Core model
-           aMortalityNGTrate.under55=2,
-           aMortalityNGTrate.over55=32,
-           aIGTincidenceNO=20,
-           aRRofIGTinObese=1.32,
-           aIGTrecovery=10, 
-           aDMincidenceNO=35,
-           aRRofDMinObese=2.3,
-           aRRofSSBs=13,
-           aRRofDMinElderly=1.5,
-           aRRofMortalityDM.over55=1.65, 
-           aRRofMortalityDM.under55=3.0)
  
  upstream.combo.case<-data.frame(ode(y=stocks, times=simtime, func = model, 
                            parms=auxs, method='euler'))
@@ -451,18 +345,7 @@ model <- function(time, stocks, auxs){
  # in RR for mortality and Pre-DM recovery
 
  ## healthcare
- # Set up simulation and time step #
- START<-2020; FINISH<-2050; STEP<-1
- 
- # Create time vector
- simtime <- seq(START, FINISH, by=STEP)
- 
- # Create stock and auxs
- stocks <- c(sNGT=base.case$sNGT[base.case$time == 2020],
-             sIGT=base.case$sIGT[base.case$time == 2020],
-             sDM=base.case$sDM[base.case$time ==2020],
-             sAvgBdWt=base.case$sAvgBdWt[base.case$time == 2020],
-             sFV=base.case$sFV[base.case$time == 2020])
+
  
   auxs <- c(aInterventionYear=2020,
           
