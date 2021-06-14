@@ -187,4 +187,20 @@ minutes.LT <- c(0, 1, 2, 4, 10, 11, 22, 60)
 
 ff.LTPA.RR <- approxfun(minutes.LT, LTPA.RR)
 
+## Total PAL calculations and assumptions
+
+Total.minutes <- 1440
+Sleep.time <- 8*60
+LightPA.time <- 6*60
+SleepMets <- Sleep.time*0.95
+LightPAMets <- LightPA.time*2
+
+#healthcare intervention effect sizes
+# percentage point increase in remission from pre-diabetes, evidence derived from DPP
+IGT.effect <- 1
+
+# % reduction in RR of mortality by age group
+RR.hc.over55 <- .05
+RR.hc.under55 <- .05
+
 

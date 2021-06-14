@@ -8,13 +8,37 @@ library(plyr)
 library(grid)
 library(gridExtra)
 
+#upload information on assumptions and inputs for various runs
+auxs.file <- read.csv("auxs.csv", header=TRUE)
+
+base.auxs <- auxs.file$base
+names(base.auxs) <- as.character(auxs.file$variable)
+
+pa.auxs <- auxs.file$PA
+names(pa.auxs) <- as.character(auxs.file$variable)
+
+food.auxs <- auxs.file$food
+names(food.auxs) <- as.character(auxs.file$variable)
+
+upstream.auxs <- auxs.file$upstream
+names(upstream.auxs) <- as.character(auxs.file$variable)
+
+hc.auxs <- auxs.file$hc
+names(hc.auxs) <- as.character(auxs.file$variable)
+
+allin.auxs <- auxs.file$allin
+names(allin.auxs) <- as.character(auxs.file$variable)
+
+hc.switch <- 0
+
 model <- function(time, stocks, auxs){
   
   with(as.list(c(stocks, auxs)),{
   #  browser()
     # simple function implement an intervention year
-    intervention.year <- function(x){
-      x.time <- c(rep(0, 2050-aInterventionYear), rep(x, 61-(2050-aInterventionYear)))
+    
+  intervention.year <- function(x){
+      x.time <- c(rep(0, FINISH - aInterventionYear), rep(x, aInterventionYear + 1 - START))
     }
     
     #SSB calories
@@ -109,12 +133,6 @@ model <- function(time, stocks, auxs){
     aActiveMets.W <- aMVPA.W*5.2
     aActiveMets.M <- aMVPA.M*5.2
     
-    Total.minutes <- 1440
-    Sleep.time <- 8*60
-    LightPA.time <- 6*60
-    SleepMets <- Sleep.time*0.95
-    LightPAMets <- LightPA.time*2
-    
     Sedentary.T.W <- Total.minutes - aMVPA.W - Sleep.time - LightPA.time
     SedentaryMets.W <- Sedentary.T.W*1.5
     
@@ -157,6 +175,9 @@ model <- function(time, stocks, auxs){
     aObesefractIGT <- aObeseTotal*1.2
     
     ## Core Model
+    hc.prep <- intervention.year(hc.switch)
+    hc.intervention <- approxfun(years.all, hc.prep)
+    
     # NGT
     # Inflow of adult population
     fAdultGrowth <- pop.inflow(time)
@@ -174,7 +195,7 @@ model <- function(time, stocks, auxs){
     # Inflow of IGT recovery
     # create an option for modifying the rate of recovery as a HC intervention
     
-    fIGTRecovery <- aIGTrecovery/100*sIGT
+    fIGTRecovery <- (aIGTrecovery + IGT.effect*hc.intervention(time))/100*sIGT
     
     # NGT stock equation
     dNGT_dt <- fAdultGrowth - fNGTMortality - fIGTOnset + fIGTRecovery 
@@ -208,8 +229,11 @@ model <- function(time, stocks, auxs){
     
     # DM
     # Outflow DM mortality
-    fDMMortality <- (sDM*(under.55/100)*aRRofMortalityDM.under55*(aMortalityNGTrate.under55/1000)) +
-      (sDM*aRRofMortalityDM.over55*(aMortalityNGTrate.over55/1000)*(over.55(time)/100))
+    hc.rr.mortality.under55 <- aRRofMortalityDM.under55 - (hc.intervention(time)*RR.hc.under55*aRRofMortalityDM.under55)
+    hc.rr.mortality.over55 <- aRRofMortalityDM.over55 - (hc.intervention(time)*RR.hc.over55*aRRofMortalityDM.over55)
+    
+    fDMMortality <- (sDM*(under.55/100)*hc.rr.mortality.under55*(aMortalityNGTrate.under55/1000)) +
+      (sDM*hc.rr.mortality.over55*(aMortalityNGTrate.over55/1000)*(over.55(time)/100))
    
     # DM Stock equation
     dDM_dt <- fDMOnset - fDMMortality
@@ -259,184 +283,98 @@ model <- function(time, stocks, auxs){
                sAvgBdWt.W=aInitAvgWt.W,
                sFV=aInitFVStock) 
   
-  auxs <- c(aInterventionYear=2020,
+  #base run
+  auxs <- base.auxs
     
-    #interventions
-    aSSBPriceChange=0, #intervention point
-    aIncreaseinFV=0, #intervention point for increase in production as a percentage
-    aPriceChangeFV=0,#intervention point change as a percentage (+ for increase, - for decrease)
-    aPriceChangeUH=0,#intervention point change as a percentage
-    aFVPH.switch=0, #set to 1 for intervention, fruit and veg consumption PH campaign
-    aUHPH.switch=0, #set to 1 for intervention, traffic light labeling of food
-    aInfra.switch=0, #change to 1 for intervention, infrastructure for active transport
-    aPublic.switch=0, #change to 1 for interventions to increase public transportation
-    aPAPH.Campaign=0, #change to 1 for intervention, PA awareness campaign
-    
-    #ssb assumptions
-    aElasticity.SSB=-1.3,
-    aEffectSSB.Campaign=-0.5,
-    aSSBperUnitCal=130,
-    
-    #Calories from food assumptions
-    aImportsTourism=60,
-    aLocalTourism=15,
-    aElasFVPrice=-.65,
-    aUHFVCrossPrice=0.07,
-    aInitFVIntake=73,
-    aEffectFVPH=3.59,
-    aCalperFV=1,
-    aElasUHFoods=-0.09,
-    aEffectUHPH=-3.59,#traffic light system of food labeling
-    
-    #Physical activity calories
-    aPublic.Transport=4.3, # min/day added from better public transport
-    aEffectInfra=16, 
-    aRRPACampaign=1.28, 
-    aMETsMVPA=5.2,
-    
-    #Obesity
-    aAvgHeight.M=1.72,
-    aAvgHeight.W=1.59,
-
-    
-    #Core model
-    aMortalityNGTrate.under55=2,
-    aMortalityNGTrate.over55=32,
-    aIGTincidenceNO=20,
-    aRRofIGTinObese=1.32,
-    aIGTrecovery=10, 
-    aDMincidenceNO=35,
-    aRRofDMinObese=2.3,
-    aRRofSSBs=13,
-    aRRofDMinElderly=1.5,
-    aRRofMortalityDM.over55=1.65, 
-    aRRofMortalityDM.under55=3.0)
-
-  
   base.case<-data.frame(ode(y=stocks, times=simtime, func = model, 
                     parms=auxs, method='euler'))
 
   # Set up simulation and time step #
-  START<-2020; FINISH<-2050; STEP<-1
+  #START <- 2015; FINISH <- 2050; STEP <- 1
   
   # Create time vector
   simtime <- seq(START, FINISH, by=STEP)
   
-  # Create stock and auxs
-  stocks <- c(sNGT=base.case$sNGT[base.case$time == 2020],
-              sIGT=base.case$sIGT[base.case$time == 2020],
-              sDM=base.case$sDM[base.case$time ==2020],
-              sAvgBdWt=base.case$sAvgBdWt[base.case$time == 2020],
-              sFV=base.case$sFV[base.case$time == 2020])
+  # # Create stock and auxs
+  # stocks <- c(sNGT=base.case$sNGT[base.case$time == 2015],
+  #             sIGT=base.case$sIGT[base.case$time == 2015],
+  #             sDM=base.case$sDM[base.case$time ==2015],
+  #             sAvgBdWt.M=base.case$sAvgBdWt.M[base.case$time == 2015],
+  #             sAvgBdWt.W=base.case$sAvgBdWt.W[base.case$time == 2015],
+  #             sFV=base.case$sFV[base.case$time == 2015])
+  # 
+  #physical activity interventions
+  auxs <- pa.auxs
   
- pa.case<-data.frame(ode(y=stocks, times=simtime, func = model, 
+  pa.case<-data.frame(ode(y=stocks, times=simtime, func = model, 
                             parms=auxs, method='euler'))
+  
  
- food.case<-data.frame(ode(y=stocks, times=simtime, func = model, 
+  #food system interventions
+  auxs <- food.auxs
+ 
+  food.case<-data.frame(ode(y=stocks, times=simtime, func = model, 
                          parms=auxs, method='euler'))
  
- 
- upstream.combo.case<-data.frame(ode(y=stocks, times=simtime, func = model, 
+  #upstream interventions
+  auxs <- upstream.auxs
+  
+  upstream.combo.case<-data.frame(ode(y=stocks, times=simtime, func = model, 
                            parms=auxs, method='euler'))
-
-
-# healthcare only
-## Need to modify the time of running the model to be able to intervene with changes 
- # in RR for mortality and Pre-DM recovery
-
- ## healthcare
-
  
-  auxs <- c(aInterventionYear=2020,
-          
-          #interventions
-          aSSBPriceChange=0, #intervention point
-          aIncreaseinFV=0, #intervention point for increase in production as a percentage
-          aPriceChangeFV=0,#intervention point change as a percentage (+ for increase, - for decrease)
-          aPriceChangeUH=0,#intervention point change as a percentage
-          aFVPH.switch=0, #set to 1 for intervention, fruit and veg consumption PH campaign
-          aUHPH.switch=0, #set to 1 for intervention, traffic light labeling of food
-          aInfra.switch=0, #change to 1 for intervention, infrastructure for active transport
-          aPublic.switch=0, #change to 1 for interventions to increase public transportation
-          aPAPH.Campaign=0, #change to 1 for intervention, PA awareness campaign
-          
-          #ssb assumptions
-          aElasticity.SSB=-1.3,
-          aEffectSSB.Campaign=-0.5,
-          aSSBperUnitCal=130,
-          
-          #Calories from food assumptions
-          aImportsTourism=60,
-          aLocalTourism=15,
-          aElasFVPrice=-.65,
-          aUHFVCrossPrice=0.07,
-          aInitFVIntake=73,
-          aEffectFVPH=6.2,
-          aCalperFV=1,
-          aElasUHFoods=-0.09,
-          aEffectUHPH=-3.59,#traffic light system of food labeling
-          
-          #Physical activity calories
-          aPublic.Transport=4.3, # min/day added from better public transport
-          aEffectInfra=16, 
-          aRRPACampaign=1.28, 
-          aMETsMVPA=4.0,
-          
-          #Obesity
-          aFracCalDigestion=0.1,
-          aAvgHeight=1.65,
-          
-          #Core model
-          aMortalityNGTrate.under55=2,
-          aMortalityNGTrate.over55=32,
-          aIGTincidenceNO=20,
-          aRRofIGTinObese=1.32,
-          aIGTrecovery=12, #base is 10, increase to 12 for high-risk approach 
-          aDMincidenceNO=35,
-          aRRofDMinObese=2.3,
-          aRRofSSBs=13,
-          aRRofDMinElderly=1.5,
-          aRRofMortalityDM.over55=1.32,#reduction in RR mortality of PWD by 20 percent
-          aRRofMortalityDM.under55=2.4)
-
-healthcare.case<-data.frame(ode(y=stocks, times=simtime, func = model, 
+  #healthcare
+  hc.switch <- 1
+  auxs <- hc.auxs
+  
+  healthcare.case <- data.frame(ode(y=stocks, times=simtime, func = model, 
                                     parms=auxs, method='euler'))
-
+  #all interventions at once
+  auxs <- allin.auxs
+  
+  allin.case <- data.frame(ode(y=stocks, times=simtime, func=model,
+                               parms=auxs, method='euler'))
 
 intervention.case.plot <- ggplot() +
-  geom_line(data=pa.case[pa.case$time %in% c(2020:2050),], aes(x=time, y=dmprev, color='PA only')) +
-  geom_line(data=food.case[food.case$time %in% c(2020:2050),],  aes(x=time, y=dmprev, color='Food system only')) +
-  geom_line(data=upstream.combo.case[upstream.combo.case$time %in% c(2020:2050),],  aes(x=time, y=dmprev, color='Upstream combined')) +
-  geom_line(data=healthcare.case,  aes(x=time, y=dmprev, color='Health system')) +
-  geom_line(data=base.case[base.case$time %in% c(2020:2050),],  aes(x=time, y=dmprev, color='Baseline')) +
+  geom_line(data=allin.case[allin.case$time %in% c(2015:2050),], aes(x=time, y=dmprev, color='All interventions')) +
+  geom_line(data=pa.case[pa.case$time %in% c(2015:2050),], aes(x=time, y=dmprev, color='PA only')) +
+  geom_line(data=food.case[food.case$time %in% c(2015:2050),],  aes(x=time, y=dmprev, color='Food system only')) +
+  geom_line(data=upstream.combo.case[upstream.combo.case$time %in% c(2015:2050),],  aes(x=time, y=dmprev, color='Upstream combined')) +
+  geom_line(data=healthcare.case[healthcare.case$time %in% c(2015:2050),],  aes(x=time, y=dmprev, color='Health system')) +
+  geom_line(data=base.case[base.case$time %in% c(2015:2050),],  aes(x=time, y=dmprev, color='Baseline')) +
   labs(x="Year", y="Diabetes prevalence (%)", color = 'Scenarios', title = "Effects of intervention strategies on diabetes prevalence")
 intervention.case.plot
 
 intervention.incidence.plot <- ggplot() +
-  geom_line(data=pa.case[pa.case$time %in% c(2020:2050),], aes(x=time, y=DMOnset, color='PA only')) +
-  geom_line(data=food.case[food.case$time %in% c(2020:2050),],  aes(x=time, y=DMOnset, color='Food system only')) +
-  geom_line(data=upstream.combo.case[upstream.combo.case$time %in% c(2020:2050),],  aes(x=time, y=DMOnset, color='Upstream combined')) +
-  geom_line(data=healthcare.case,  aes(x=time, y=DMOnset, color='Health system')) +
-  geom_line(data=base.case[base.case$time %in% c(2020:2050),],  aes(x=time, y=DMOnset, color='Baseline')) +
+  geom_line(data=allin.case[allin.case$time %in% c(2015:2050),], aes(x=time, y=DMOnset, color='All interventions')) +
+  geom_line(data=pa.case[pa.case$time %in% c(2015:2050),], aes(x=time, y=DMOnset, color='PA only')) +
+  geom_line(data=food.case[food.case$time %in% c(2015:2050),],  aes(x=time, y=DMOnset, color='Food system only')) +
+  geom_line(data=upstream.combo.case[upstream.combo.case$time %in% c(2015:2050),],  aes(x=time, y=DMOnset, color='Upstream combined')) +
+  geom_line(data=healthcare.case[healthcare.case$time %in% c(2015:2050),],  aes(x=time, y=DMOnset, color='Health system')) +
+  geom_line(data=base.case[base.case$time %in% c(2015:2050),],  aes(x=time, y=DMOnset, color='Baseline')) +
   labs(x="Year", y="Diabetes new cases (in 1000s)", color = 'Scenarios', title = "Effects of intervention strategies new diabetes cases")
 intervention.incidence.plot
 
 
 intervention.deaths.plot <- ggplot() +
-  geom_line(data=pa.case[pa.case$time %in% c(2020:2050),], aes(x=time, y=DMMortality, color='PA only')) +
-  geom_line(data=food.case[food.case$time %in% c(2020:2050),],  aes(x=time, y=DMMortality, color='Food system only')) +
-  geom_line(data=upstream.combo.case[upstream.combo.case$time %in% c(2020:2050),],  aes(x=time, y=DMMortality, color='Upstream combined')) +
-  geom_line(data=healthcare.case,  aes(x=time, y=DMMortality, color='Health system')) +
-  geom_line(data=base.case[base.case$time %in% c(2020:2050),],  aes(x=time, y=DMMortality, color='Baseline')) +
+  geom_line(data=allin.case[allin.case$time %in% c(2015:2050),], aes(x=time, y=DMMortality, color='All interventions')) +
+  geom_line(data=pa.case[pa.case$time %in% c(2015:2050),], aes(x=time, y=DMMortality, color='PA only')) +
+  geom_line(data=food.case[food.case$time %in% c(2015:2050),],  aes(x=time, y=DMMortality, color='Food system only')) +
+  geom_line(data=upstream.combo.case[upstream.combo.case$time %in% c(2015:2050),],  aes(x=time, y=DMMortality, color='Upstream combined')) +
+  geom_line(data=healthcare.case[healthcare.case$time %in% c(2015:2050),],  aes(x=time, y=DMMortality, color='Health system')) +
+  geom_line(data=base.case[base.case$time %in% c(2015:2050),],  aes(x=time, y=DMMortality, color='Baseline')) +
   labs(x="Year", y="Deaths in PWD in 1000s)", color = 'Scenarios', title = "Effects of intervention strategies on deaths in PWD")
 intervention.deaths.plot
 
 
 intervention.obesity.plot <- ggplot() +
-  geom_line(data=pa.case[pa.case$time %in% c(2020:2050),], aes(x=time, y=Obesity, color='PA only')) +
-  geom_line(data=food.case[food.case$time %in% c(2020:2050),],  aes(x=time, y=Obesity, color='Food system only')) +
-  geom_line(data=upstream.combo.case[upstream.combo.case$time %in% c(2020:2050),],  aes(x=time, y=Obesity, color='Upstream combined')) +
-  geom_line(data=healthcare.case,  aes(x=time, y=Obesity, color='Health system')) +
-  geom_line(data=base.case[base.case$time %in% c(2020:2050),],  aes(x=time, y=Obesity, color='Baseline')) +
+  geom_line(data=allin.case[allin.case$time %in% c(2015:2050),], aes(x=time, y=Obesity, color='All interventions')) +
+  geom_line(data=pa.case[pa.case$time %in% c(2015:2050),], aes(x=time, y=Obesity, color='PA only')) +
+  geom_line(data=food.case[food.case$time %in% c(2015:2050),],  aes(x=time, y=Obesity, color='Food system only')) +
+  geom_line(data=upstream.combo.case[upstream.combo.case$time %in% c(2015:2050),],  aes(x=time, y=Obesity, color='Upstream combined')) +
+  geom_line(data=healthcare.case[healthcare.case$time %in% c(2015:2050),],  aes(x=time, y=Obesity, color='Health system')) +
+  geom_line(data=base.case[base.case$time %in% c(2015:2050),],  aes(x=time, y=Obesity, color='Baseline')) +
   labs(x="Year", y="Obesity prevalence (%)", color = 'Scenarios', title = "Effects of intervention strategies on obesity prevalence")
 intervention.obesity.plot
+
+
+
