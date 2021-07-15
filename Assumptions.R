@@ -1,3 +1,11 @@
+# load necessary packages #
+library(deSolve)
+library(ggplot2)
+library(FME)
+library(plyr)
+library(grid)
+library(gridExtra)
+
 years <-c(1990, 1995, 2000, 2005, 2010, 2015, 2020,
           2025, 2030, 2035, 2040, 2045, 2050)
 years.all <- 1990:2050
@@ -73,6 +81,14 @@ UHCalories <- c(239.88, 244.8, 249.72, 254.88, 260.04, 265.32, 270.72,
                 656.16, 669.24, 682.68, 696.36, 710.28, 724.44, 738.96, 753.72,
                 768.84)
 ffUHCalories <- approxfun(years.all, UHCalories)
+replace.UPF.switch <- 0
+
+UPF.kcal <- c(rep(0, 30), 424.44, 432.96, 441.6, 450.36, 459.36, 468.6,
+              477.96, 487.56, 497.28, 507.24, 517.32, 527.76, 538.32, 549,
+              560.04, 571.2, 582.6, 594.24, 606.24, 618.36, 630.72, 643.32,
+              656.16, 669.24, 682.68, 696.36, 710.28, 724.44, 738.96, 753.72,
+              768.84)/2
+UPF.to.FV.g <- approxfun(years.all, UPF.kcal)
 
 #estimating calories from other food sources
 OtherIntake <- 1550
@@ -193,14 +209,15 @@ Total.minutes <- 1440
 Sleep.time <- 8*60
 LightPA.time <- 6*60
 SleepMets <- Sleep.time*0.95
-LightPAMets <- LightPA.time*2
+Sedentary.switch <- 0
+hours.LPA.increase <- 4
 
 #healthcare intervention effect sizes
 # percentage point increase in remission from pre-diabetes, evidence derived from DPP
-IGT.effect <- 1
+IGT.effect <- .5
 
 # % reduction in RR of mortality by age group
-RR.hc.over55 <- .05
-RR.hc.under55 <- .05
+RR.hc.over55 <- .0625
+RR.hc.under55 <- .0625 # HR of 0.75 from meta-anlysis of in-person self-management education doi: 10.1007/s12020-016-1168-2
 
 
