@@ -33,6 +33,11 @@ model <- function(time, stocks, auxs){
       x.time <- c(rep(0, FINISH - aInterventionYear), rep(x, aInterventionYear + 1 - START))
     }
     
+    #estimate prevalence and incidence
+    dmprev <- sDM*100/(sDM + spreDM + sNG)
+    ngprev <- sNG*100/(sDM + spreDM + sNG)
+    predmprev <- spreDM*100/(sDM + spreDM + sNG)
+  
     #SSB calories
     ## function for calculating SSB price change from intervention start date
     SSB.price <- intervention.year(aSSBPriceChange)
@@ -42,21 +47,6 @@ model <- function(time, stocks, auxs){
     aAvgSSBConsumption <- ffSSB(time) + (aEffectSSBPriceChange/100)
     aCaloriesSSB <- aAvgSSBConsumption*aSSBperUnitCal
      #Food calories
-  
-    #inflow of Fruit and Vegetable production
-    FV.increase.int <- intervention.year(aIncreaseinFV)
-    ffFV.increase <- approxfun(START:FINISH, FV.increase.int)
-    
-    aFVProduction <- ((ffInitialFVProduction(time)*1000) + 
-                        ((ffFV.increase(time))/100*ffInitialFVProduction(time)*1000))/ffTotalPopulation(time)
-    
-    aFVImports <- ffTotalkgImports(time)/ffTotalPopulation(time)
-    fFVSupply <- (ffTotalkgImports(time) - (ffTotalkgImports(time)*aImportsTourism/100)) + 
-      (aFVProduction - (aFVProduction*aLocalTourism/100))
-    
-    #outflow of waste and export
-    fFVExport <- ffFVExport(time)/ffTotalPopulation(time) #per capita export per year
-    fFVWaste <- sFV * .3
     
     #currently modeling an increase in price for FV - if a decrease needed, then needs to be (-)
     Price.change.FV <- intervention.year(aPriceChangeFV)
@@ -96,9 +86,6 @@ model <- function(time, stocks, auxs){
     Ratio.Intake <- 1.17 #ratio of calorie intake in Men to Women
     aDailyIntake.W <- aDailyIntake.Total/((per.women/100) + (per.men/100)*Ratio.Intake)
     aDailyIntake.M <- aDailyIntake.W*Ratio.Intake
-    
-    #Fruit and vegetable stock equation
-    dFV_dt <-  fFVSupply - fFVWaste - fFVExport - fFVConsumption
     
     #Physical activity
     aWorkMVPA <- ff.work.mvpa(time)
@@ -143,7 +130,6 @@ model <- function(time, stocks, auxs){
     
     aPAL.W <- (SedentaryMets.W + aActiveMets.W + SleepMets + LightPAMets)/Total.minutes
     aPAL.M <-(SedentaryMets.M + aActiveMets.M + SleepMets + LightPAMets)/Total.minutes
- 
   
     ##Obesity module
     # Men
@@ -171,83 +157,114 @@ model <- function(time, stocks, auxs){
     
     aMod.BMI <- aMod.BMI.M*per.men/100 + aMod.BMI.W*per.women/100
     
-    aObeseTotal <- 40.3 - 6.45*aMod.BMI + 0.219*aMod.BMI^2
-      
-    aObesefractNGT <- aObeseTotal*0.8
-    aObesefractIGT <- aObeseTotal*1.2
-    
+    aObeseTotal <- 40.3 - 6.46*aMod.BMI + 0.222*aMod.BMI^2
+   
     ## Core Model
     hc.prep <- intervention.year(hc.switch)
     hc.intervention <- approxfun(START:FINISH, hc.prep)
     
-    # NGT
+    # NG
     # Inflow of adult population
     fAdultGrowth <- pop.inflow(time)
     
-    # Outflow NGT mortality
+    # Outflow NG mortality
+    # Obese fractions
+    obese.NG <- aObeseTotal/(ngprev/100 + predmprev/100*aRRofpreDMinObese + dmprev/100*aRRofDMinObese)
+    obese.preDM <- obese.NG*aRRofpreDMinObese*100/(aRRofpreDMinObese*obese.NG + (100 - obese.NG))
+    obese.DM <- obese.preDM*aRRofDMinObese*100/(aRRofDMinObese*obese.preDM + (100 - obese.preDM))
+    
+    #estimate prevalence and incidence
     under.55 <- 100-over.55(time)
-    fNGTMortality <- (sNGT*(aMortalityNGTrate.under55/1000)*(under.55/100)) +
-      (sNGT*(aMortalityNGTrate.over55/1000)*(over.55(time)/100))
+    over.55ng <- over.55(time)/(dmprev/100*aRRofDMinElderly + predmprev/100*aRRofpreDMinElderly + ngprev/100)
+    over.55predm <- over.55ng*aRRofpreDMinElderly*100/(aRRofpreDMinElderly*over.55ng + (100 - over.55ng))
+    over.55dm <- over.55predm*aRRofDMinElderly*100/(aRRofDMinElderly*over.55predm + (100 - over.55predm))
+    under.55ng <- (100-over.55ng)
+    under.55predm <- (100-over.55predm)
+    under.55dm <- (100-over.55dm)
+    
+    
+    #under 55 deaths
+    dmprev.under55 <- (sDM*under.55dm)*100 / ((sDM + spreDM + sNG)*under.55)
+    
+    aMortalityNGrate.under55 <- aMortalityTotalrate.under55/ 
+                                      ((100 - dmprev.under55)/100 + aRRofMortalityDM.under55 * dmprev.under55/100)
+    
+    #over 55 deaths
+    dmprev.over55 <- (sDM*over.55dm)*100 / ((sDM + spreDM + sNG)*over.55(time))
+    
+    aMortalityNGrate.over55 <- aMortalityTotalrate.over55/ 
+                                    ((100 - dmprev.over55)/100 + aRRofMortalityDM.over55 * dmprev.over55/100)
+    
+    fNGMortality <- (sNG*(aMortalityNGrate.under55/1000)*(under.55ng/100)) +
+      (sNG*(aMortalityNGrate.over55/1000)*(over.55ng/100))
       
-    # Flow of new cases to IGT/IFG
-    aIGTObese <- sNGT*(aObesefractNGT/100)*(aIGTincidenceNO/1000)*aRRofIGTinObese
-    aIGTNonObese <- sNGT*((100-aObesefractNGT)/100)*(aIGTincidenceNO/1000)
-    fIGTOnset <- aIGTObese + aIGTNonObese
+    # Flow of new cases to preDM/IFG
+    EffectObesityPredm <- ((1 - obese.NG/100) + (obese.NG/100*aRRofpreDMinObese)) / 
+                             ((1 - obese.NG.init/100) + (obese.NG.init/100*aRRofpreDMinObese))
     
-    # Inflow of IGT recovery
+    EffectAgingPredm <- ((1 - over.55ng/100) + (over.55ng/100*aRRofpreDMinElderly)) / 
+                                ((1 - over.55ng.init/100) + (over.55ng.init/100*aRRofpreDMinElderly))
+    
+    preDMonsetrate <- apreDMincidence*EffectObesityPredm*EffectAgingPredm
+    
+    fpreDMOnset <- preDMonsetrate/1000*sNG
+    
+    # Inflow of preDM recovery
     # create an option for modifying the rate of recovery as a HC intervention
+    fpreDMRecovery <- (apreDMrecovery + preDM.effect*hc.intervention(time))/100*spreDM
     
-    fIGTRecovery <- (aIGTrecovery + IGT.effect*hc.intervention(time))/100*sIGT
+    # NG stock equation
+    dNG_dt <- fAdultGrowth - fNGMortality - fpreDMOnset + fpreDMRecovery 
     
-    # NGT stock equation
-    dNGT_dt <- fAdultGrowth - fNGTMortality - fIGTOnset + fIGTRecovery 
-    
-    # IGT
-    # Outflow IGT mortality
-    fIGTMortality <- (sIGT*(aMortalityNGTrate.under55/1000)*(under.55/100)) +
-      (sIGT*(aMortalityNGTrate.over55/1000)*(over.55(time)/100))
-    
+    # preDM
+    # Outflow preDM mortality
+  
+    fpreDMMortality <- (spreDM*(aMortalityNGrate.under55/1000)*(under.55predm/100)) +
+      (spreDM*(aMortalityNGrate.over55/1000)*(over.55predm/100))
+
     # Outflow DM Onset
-    aDMinNonObese <- sIGT*((100-aObesefractIGT)/100)*(aDMincidenceNO/1000)
-    aDMinObese <- (aObesefractIGT/100)*sIGT*(aDMincidenceNO/1000)*aRRofDMinObese
-    aDMOnsetObesity <- aDMinObese + aDMinNonObese
-    aDMOnsetPA <- aDMOnsetObesity*ff.LTPA.RR(aLTMVPA.with.infra*7/60)
-    aDMOnsetSSB <- aDMOnsetPA + (aDMOnsetPA*(aRRofSSBs/100)*aAvgSSBConsumption)
+    EffectObesityDM <- ((1 - obese.preDM/100) + (obese.preDM/100*aRRofDMinObese)) / 
+                          ((1 - obese.preDM.init/100) + (obese.preDM.init/100*aRRofDMinObese))
+    
+    EffectAgingDM <- ((1 - over.55predm/100) + (over.55predm/100*aRRofDMinElderly)) / 
+                      ((1 - over.55predm.init/100) + (over.55predm.init/100*aRRofDMinElderly))
+    
+    EffectPADM <- ff.LTPA.RR((aLTMVPA.with.infra - aLTMVPA.with.infra.init)*7/60)
     
     FV.Daily <- aInitFVIntake*1000/365
+    EffectFVDM <- 1 - (FV.Daily - FV.Daily.init)/200 * 0.02
     
-    aDMwithFV <- (100 - FV.Daily*0.02)/100*aDMOnsetSSB
-   
-    aDMOnsetAging <- ((over.65(time)/100)*aRRofDMinElderly*aDMwithFV) +
-      (((100-over.65(time))/100)*aDMwithFV)
-    fDMOnset <- aDMOnsetAging
+    EffectSSBDM <- 1 + (aAvgSSBConsumption - aAvgSSBConsumption.init) * aRRofSSBs/100 
+    ## try and add a delay function here use if/else with switch for SB consumption
+    
+    DMOnsetRate <- aDMincidence * EffectObesityDM * EffectAgingDM * EffectFVDM * EffectSSBDM
+    fDMOnset <- spreDM * DMOnsetRate/1000
      
-    # IGT Stock equation
-    dIGT_dt <- fIGTOnset - fIGTRecovery - fIGTMortality - fDMOnset
+    # preDM Stock equation
+    dpreDM_dt <- fpreDMOnset - fpreDMRecovery - fpreDMMortality - fDMOnset
     
     # DM
     # Outflow DM mortality
     hc.rr.mortality.under55 <- aRRofMortalityDM.under55 - (hc.intervention(time)*RR.hc.under55*aRRofMortalityDM.under55)
     hc.rr.mortality.over55 <- aRRofMortalityDM.over55 - (hc.intervention(time)*RR.hc.over55*aRRofMortalityDM.over55)
     
-    fDMMortality <- (sDM*(under.55/100)*hc.rr.mortality.under55*(aMortalityNGTrate.under55/1000)) +
-      (sDM*hc.rr.mortality.over55*(aMortalityNGTrate.over55/1000)*(over.55(time)/100))
+    fDMMortality <- (sDM*(under.55dm/100)*hc.rr.mortality.under55*(aMortalityNGrate.under55/1000)) +
+      (sDM*hc.rr.mortality.over55*(aMortalityNGrate.over55/1000)*(over.55dm/100))
    
     # DM Stock equation
     dDM_dt <- fDMOnset - fDMMortality
     
-    #estimate prevalence and incidence
-    dmprev <- sDM*100/(sDM + sIGT + sNGT)
-    dminc <- fDMOnset * 1000/(sIGT + sNGT)
+    dminc <- fDMOnset * 1000/(spreDM + sNG)
+    
     
     # All the results for the time step
-    ans <- list(c(dNGT_dt, dIGT_dt, dDM_dt, dAvg.wt_dt.M, dAvg.wt_dt.W, dFV_dt),
-                NGTOnset=fAdultGrowth,
-                NGTMortality=fNGTMortality,
-                NGTNetFlow=dNGT_dt,
-                IGTOnset=fIGTOnset,
-                IGTMortality=fIGTMortality,
-                IGTNetFlow=dIGT_dt,
+    ans <- list(c(dNG_dt, dpreDM_dt, dDM_dt, dAvg.wt_dt.M, dAvg.wt_dt.W),
+                NGOnset=fAdultGrowth,
+                NGMortality=fNGMortality,
+                NGNetFlow=dNG_dt,
+                preDMOnset=fpreDMOnset,
+                preDMMortality=fpreDMMortality,
+                preDMNetFlow=dpreDM_dt,
                 DMOnset=fDMOnset,
                 DMMortality=fDMMortality,
                 DMNetFlow=dDM_dt,
@@ -256,11 +273,17 @@ model <- function(time, stocks, auxs){
                 Obesity=aObeseTotal,
                 dmprev=dmprev,
                 dminc=dminc,
-                DMincNO=aDMinNonObese,
-                DMinO=aDMinObese,
-                DMOandNO=aDMOnsetObesity,
-                DMOPA=aDMOnsetPA,
-                LTMPVA=aLTMVPA.with.infra)
+                obese.NG=obese.NG,
+                obese.preDM=obese.preDM,
+                ngprev=ngprev,
+                predmprev=predmprev,
+                EffectObesityDM=EffectObesityDM,
+                EffectSSBDM=EffectSSBDM,
+                EffectAgingDM=EffectAgingDM,
+                EffectPADM=EffectPADM,
+                EffectFVDM=EffectFVDM,
+                DMOnsetRate=DMOnsetRate,
+                aLTMVPA.with.infra=aLTMVPA.with.infra)
     
   })
 }
@@ -275,12 +298,11 @@ model <- function(time, stocks, auxs){
   
   # Create stock and auxs
   
-  stocks  <- c(sNGT=Baseline.NGT,
-               sIGT=Baseline.IGT,
+  stocks  <- c(sNG=Baseline.NG,
+               spreDM=Baseline.preDM,
                sDM=Baseline.DM,
                sAvgBdWt.M=aInitAvgWt.M,
-               sAvgBdWt.W=aInitAvgWt.W,
-               sFV=aInitFVStock) 
+               sAvgBdWt.W=aInitAvgWt.W) 
   
   #base run
   auxs <- base.auxs
@@ -295,8 +317,8 @@ model <- function(time, stocks, auxs){
   simtime <- seq(START, FINISH, by=STEP)
   
   # # Create stock and auxs
-  # stocks <- c(sNGT=base.case$sNGT[base.case$time == 2015],
-  #             sIGT=base.case$sIGT[base.case$time == 2015],
+  # stocks <- c(sNG=base.case$sNG[base.case$time == 2015],
+  #             spreDM=base.case$spreDM[base.case$time == 2015],
   #             sDM=base.case$sDM[base.case$time ==2015],
   #             sAvgBdWt.M=base.case$sAvgBdWt.M[base.case$time == 2015],
   #             sAvgBdWt.W=base.case$sAvgBdWt.W[base.case$time == 2015],
@@ -459,7 +481,7 @@ UHCalories.new <- c(239.88, 244.8, 249.72, 254.88, 260.04, 265.32, 270.72,
 ffUHCalories <- approxfun(years.all, UHCalories.new)
 
 # set SSBs to 0 at 2020
-SSB.trend.new <- c(2.0, 2.1, 2.1, 2.1, 2.1, 2.2,2.2, 0, 0)
+SSB.trend.new <- c(2.0, 2.1, 2.1, 2.1, 2.1, 2.2, 2.2, 0, 0) ## PUT THE DELAY HERE!
 ffSSB <- approxfun(c(1990, 1995, 2000, 2005, 2010, 2015, 2019, 2020, 2050), SSB.trend.new)
 
 no.upf <- data.frame(ode(y=stocks, times=simtime, func = model, 

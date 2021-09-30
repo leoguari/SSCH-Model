@@ -12,17 +12,31 @@ years.all <- 1990:2050
 aInterventionYear <- 2020
 
 #Baseline assumptions
-#Assuming a baseline share of prev of DM in adults 2%, IGT 5%, 93% NGT
+#Assuming a baseline share of prev of DM in adults 2%, preDM 5%, 93% NG
 Baseline.Pop <- 1317 #in 1000s so 1.9 million is baseline
-Baseline.IGT <- .07*Baseline.Pop
-Baseline.DM <- .035*Baseline.Pop
-Baseline.NGT <- Baseline.Pop - (Baseline.IGT + Baseline.DM)
+Baseline.preDM <- .07*Baseline.Pop
+Baseline.DM <- .045*Baseline.Pop
+Baseline.NG <- Baseline.Pop - (Baseline.preDM + Baseline.DM)
 aInitFVStock <- 250
 aInitAvgWt.M <- 70
 aInitAvgWt.W <- 71
 per.women <-52
 per.men <- 48
-BMI.ratio <- 1.17
+
+obese.NG.init <- 18.83493
+obese.preDM.init <- 28.28956
+obese.DM.init <- 60.60726
+
+over.55ng.init <- 20.68966
+over.55predm.init <- 23.84106
+over.55dm.init <- 43.30507
+under.55ng.init <- 100 - over.55ng.init
+under.55predm.init <- 100 - over.55predm.init
+under.55dm.init <- 100 - over.55dm.init
+
+FV.Daily.init <- 200
+aAvgSSBConsumption.init <- 2
+aLTMVPA.with.infra.init <- 5.0
 
 # average age from WPP
 age.m <- c(40.7, 41.0, 41.9, 42.5, 42.8, 42.9, 43.4, 44.4, 45.5, 46.5, 47.5, 48.5, 49.4)
@@ -33,9 +47,9 @@ aAvgAge.W <-  approxfun(years, age.w)
 
 #Functions for the model
 #Estimating the RR reduction in DM from PA
-PaRRs <- c(1, 0.99, 0.93, 0.87, 0.76, 0.74, 0.64, 0.47)
-PAHrs <- c(0, 1, 2, 4, 10, 11, 22, 60)
-ff <- approxfun(PAHrs, PaRRs)
+# PaRRs <- c(1, 0.99, 0.93, 0.87, 0.76, 0.74, 0.64, 0.47)
+# PAHrs <- c(0, 1, 2, 4, 10, 11, 22, 60)
+# ff <- approxfun(PAHrs, PaRRs)
 
 #Estimating population inflow, number of adults added
 # in 1000s
@@ -50,28 +64,19 @@ people <-c(37, 37.6, 37.6, 39.6, 34.6, 35.6, 40.8, 38.8,
            29.4, 27.4)
 pop.inflow <- approxfun(years.all, people)
 
-# fraction of population of 65 - for use in RR of mortality
-Fract.Over65 <- c(13, 13, 13, 13, 13, 13, 13, 13, 13,
-                  13, 13, 13, 13, 13, 13, 13, 13, 13,
-                  13, 13, 13, 13, 13, 13, 13, 13, 13,
-                  13, 13, 13, 13, 13, 14, 14, 14, 15,
-                  15, 16, 16, 16, 17, 17, 18, 18, 18,
-                  19, 19, 20, 20, 20, 21, 21, 21, 21,
-                  22, 22, 22, 23, 23, 24, 24)
-over.65 <- approxfun(years.all, Fract.Over65)
-
-Fract.Over55 <- c(23.23, 23.12, 22.86, 22.79, 22.38, 22.32, 22.33,
+# fraction of population of 55 - for use in RR of mortality and preDM/DM incidences
+Fract.Over55 <- c(22.32, 22.32, 22.32, 22.32, 22.32, 22.32, 22.33,
                   22.44, 22.47, 22.62, 22.85, 22.85, 22.84, 22.92,
-                  23.07, 23.14, 23.30, 23.59, 23.74, 23.87, 24.08,
+                  23.07, 23.14, 23.3, 23.59, 23.74, 23.87, 24.08,
                   24.19, 24.41, 24.62, 24.88, 25.08, 25.31, 25.64,
-                  25.99, 26.29, 26.68, 27.11, 27.63, 28.09, 28.57,
+                  25.99, 26.29, 26.68, 27.11, 27.63,  28.09, 28.57,
                   29.11, 29.65, 30.09, 30.56, 31.02, 31.46, 31.84,
-                  32.10, 32.40, 32.64, 33.11, 33.50, 33.93, 34.46,
-                  34.98, 35.52, 36.04, 36.61, 37.16, 37.77, 38.38,
-                  39.00, 39.64, 40.31, 41.00, 41.64)
+                  32.1, 32.4, 32.64, 33.11, 33.5, 33.93, 34.46, 34.98,
+                  35.52, 36.04, 36.61, 37.16, 37.77, 38.38, 39, 39.64,
+                  40.31, 41, 41.64)
 over.55 <- approxfun(years.all, Fract.Over55)
 
-UHCalories <- c(239.88, 244.8, 249.72, 254.88, 260.04, 265.32, 270.72,
+UPFCalories <- c(239.88, 244.8, 249.72, 254.88, 260.04, 265.32, 270.72,
                 276.24, 281.88, 287.64, 293.52, 299.52, 305.64, 311.88,
                 318.24, 324.72, 331.32, 338.16, 345, 352.08, 360.12,
                 366.12, 371.64, 375.36, 381.24, 386.16, 393.36, 400.68,
@@ -80,7 +85,7 @@ UHCalories <- c(239.88, 244.8, 249.72, 254.88, 260.04, 265.32, 270.72,
                 560.04, 571.2, 582.6, 594.24, 606.24, 618.36, 630.72, 643.32,
                 656.16, 669.24, 682.68, 696.36, 710.28, 724.44, 738.96, 753.72,
                 768.84)
-ffUHCalories <- approxfun(years.all, UHCalories)
+ffUHCalories <- approxfun(years.all, UPFCalories)
 replace.UPF.switch <- 0
 
 UPF.kcal <- c(rep(0, 30), 424.44, 432.96, 441.6, 450.36, 459.36, 468.6,
@@ -91,62 +96,16 @@ UPF.kcal <- c(rep(0, 30), 424.44, 432.96, 441.6, 450.36, 459.36, 468.6,
 UPF.to.FV.g <- approxfun(years.all, UPF.kcal)
 
 #estimating calories from other food sources
-OtherIntake <- 1550
+OtherIntake <- 1600
 #ffOtherIntake <- approxfun(years.all, OtherIntake)
-
-#exports of Fruits and Vegetables from Jamaica Agriculture database
-FVExport.full <- c(14000000, 14387875, 17329309, 18232364, 18250000,
-               18250000, 18289920, 15154392, 16252016, 17176887,
-               12402018, 15042028, 13400867, 15645654, 13753094,
-               8422733, 12384329, 13168322, 10444653, 10443921,
-               12557787, 12858187, 13481384, 13403537, 13797638,
-               11922301, 15589345, 15954861, 15954861, 15954861,
-               15954861, 15732639, 15732639, 15732639, 15732639,
-               16420139, 16420139, 16642361, 16642361, 16864583,
-               16864583, 16864583, 16864583, 17086806, 17086806,
-               17086806, 17086806, 17086806, 17086806, 17086806,
-               17086806, 17309028, 17309028, 17309028, 17531250,
-               17531250, 17531250, 17531250, 17531250, 17531250,
-               17753472)
-ffFVExport <- approxfun(years.all, FVExport.full)
 
 #WPP estimates of total population from 2017
 Total.Pop.All.Ages <- c(2424, 2537, 2657, 2745, 2817, 2872, 2913, 2934, 2933, 2908, 2858, 2789, 2704) #WPP 2017
 ffTotalPopulation <- approxfun(years, Total.Pop.All.Ages)
 
-#estimates of Fruit and Vegetable imports from Jamaica Agriculture database
-TotalkgImports.full <- c(2500000, 2897861, 2709680, 6395833, 7729167,
-                     8173611, 14975153, 23684661, 29272795, 30399675,
-                     37334477, 30088706, 32777478, 30088706, 35296545,
-                     33330301, 36034691, 30824522, 29553210, 27366174,
-                     23125787, 24016223, 23024000, 21104533, 21651381,
-                     23242060,  19099595, 20618056, 20173611, 20173611,
-                     20173611, 20173611, 20173611, 19284722, 19729167,
-                     19729167, 19729167, 19729167, 19729167, 19729167,
-                     19729167, 19729167, 19729167,  19729167, 19729167,
-                     19729167,  19729167, 19729167, 19729167, 19729167,
-                     19729167, 19729167, 19729167, 19729167, 19729167,
-                     19729167, 19729167, 19729167, 19729167, 19729167,
-                     19729167)
-ffTotalkgImports <- approxfun(years.all, TotalkgImports.full)
-
-#estimates of total fruit and vegetable production
-InitialFVProduction.Full <- c(503976, 511753, 511753, 519531, 527309, 542865,
-                          542865, 542865, 542865, 553157, 450530, 490296,
-                          431579, 491473, 414790, 391707, 467802, 427305,
-                          400110, 489671, 500304, 592108, 610138, 614912,
-                          579092, 571441, 668501, 643976, 659531, 659531,
-                          659531, 667309, 667309, 667309, 667309, 667309,
-                          667309, 667309, 682865, 682865, 690642, 690642,
-                          690642, 690642, 690642, 690642, 690642, 690642,
-                          690642, 690642, 690642, 690642, 690642, 690642,
-                          690642, 690642, 690642, 690642, 690642, 690642,
-                          690642)
-ffInitialFVProduction <- approxfun(years.all, InitialFVProduction.Full)
 ## baseline SSB consumption
 SSB.trend <- c(2.0, 2.1, 2.1, 2.1, 2.1, 2.2, 2.2)
 ffSSB <- approxfun(c(1990, 1995, 2000, 2005, 2010, 2015, 2050), SSB.trend)
-
 
 ##Occupational MVPA decline function
 #assuming an annualized reduction in occupational PA of 1.2% from Ng and Popkin and initial occupational MVPA of 50 min per day
@@ -214,10 +173,10 @@ hours.LPA.increase <- 4
 
 #healthcare intervention effect sizes
 # percentage point increase in remission from pre-diabetes, evidence derived from DPP
-IGT.effect <- .5
+preDM.effect <- .5
 
 # % reduction in RR of mortality by age group
 RR.hc.over55 <- .0625
-RR.hc.under55 <- .0625 # HR of 0.75 from meta-anlysis of in-person self-management education doi: 10.1007/s12020-016-1168-2
+RR.hc.under55 <- .0625 # HR of 0.75 from meta-analysis of in-person self-management education doi: 10.1007/s12020-016-1168-2
 
 
