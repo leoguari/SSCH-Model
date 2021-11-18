@@ -5,23 +5,26 @@ library(FME)
 library(plyr)
 library(grid)
 library(gridExtra)
+library(reshape2)
 
 years <-c(1990, 1995, 2000, 2005, 2010, 2015, 2020,
           2025, 2030, 2035, 2040, 2045, 2050)
-years.all <- 1990:2050
-aInterventionYear <- 2020
+years.all <- c(1990:2050)
+#aInterventionYear <- 2020
 
 #Baseline assumptions
 #Assuming a baseline share of prev of DM in adults 2%, preDM 5%, 93% NG
 Baseline.Pop <- 1317 #in 1000s so 1.9 million is baseline
 Baseline.preDM <- .07*Baseline.Pop
-Baseline.DM <- .045*Baseline.Pop
+Baseline.DM <- .035*Baseline.Pop
 Baseline.NG <- Baseline.Pop - (Baseline.preDM + Baseline.DM)
 aInitFVStock <- 250
 aInitAvgWt.M <- 70
 aInitAvgWt.W <- 71
 per.women <-52
 per.men <- 48
+Ratio.Intake <- 1.17 #ratio of calorie intake in Men to Women
+
 
 obese.NG.init <- 18.83493
 obese.preDM.init <- 28.28956
@@ -35,8 +38,11 @@ under.55predm.init <- 100 - over.55predm.init
 under.55dm.init <- 100 - over.55dm.init
 
 FV.Daily.init <- 200
-aAvgSSBConsumption.init <- 2
-aLTMVPA.with.infra.init <- 5.0
+aAvgSSBConsumption.init <- 2.04
+aTotalMETs.init <- 2409
+#aMod.BMI <- 25.96
+
+calc_BMI <- function(time, aMod.BMI.M, aMod.BMI.W)aMod.BMI.M*per.men/100 + aMod.BMI.W*per.women/100
 
 # average age from WPP
 age.m <- c(40.7, 41.0, 41.9, 42.5, 42.8, 42.9, 43.4, 44.4, 45.5, 46.5, 47.5, 48.5, 49.4)
@@ -88,15 +94,11 @@ UPFCalories <- c(239.88, 244.8, 249.72, 254.88, 260.04, 265.32, 270.72,
 ffUHCalories <- approxfun(years.all, UPFCalories)
 replace.UPF.switch <- 0
 
-UPF.kcal <- c(rep(0, 30), 424.44, 432.96, 441.6, 450.36, 459.36, 468.6,
-              477.96, 487.56, 497.28, 507.24, 517.32, 527.76, 538.32, 549,
-              560.04, 571.2, 582.6, 594.24, 606.24, 618.36, 630.72, 643.32,
-              656.16, 669.24, 682.68, 696.36, 710.28, 724.44, 738.96, 753.72,
-              768.84)/2
+UPF.kcal <- c(rep(0, 30), UPFCalories[31:61]/2.2) ##https://pubmed.ncbi.nlm.nih.gov/31231655/
 UPF.to.FV.g <- approxfun(years.all, UPF.kcal)
 
 #estimating calories from other food sources
-OtherIntake <- 1600
+OtherIntake <- 1800
 #ffOtherIntake <- approxfun(years.all, OtherIntake)
 
 #WPP estimates of total population from 2017
@@ -104,8 +106,14 @@ Total.Pop.All.Ages <- c(2424, 2537, 2657, 2745, 2817, 2872, 2913, 2934, 2933, 29
 ffTotalPopulation <- approxfun(years, Total.Pop.All.Ages)
 
 ## baseline SSB consumption
-SSB.trend <- c(2.0, 2.1, 2.1, 2.1, 2.1, 2.2, 2.2)
-ffSSB <- approxfun(c(1990, 1995, 2000, 2005, 2010, 2015, 2050), SSB.trend)
+SSB.trend <- c(2.04, 2.05, 2.05, 2.06, 2.06, 2.06, 2.07, 2.07, 2.08,
+               2.08, 2.08, 2.09, 2.09, 2.10, 2.10, 2.10, 2.11, 2.11,
+               2.12, 2.12, 2.12, 2.13, 2.13, 2.14, 2.14, 2.14, 2.15,
+               2.15, 2.16, 2.16, 2.16, 2.17, 2.17, 2.18, 2.18, 2.18,
+               2.19, 2.19, 2.20, 2.20, 2.20, 2.21, 2.21, 2.22, 2.22,
+               2.22, 2.23, 2.23, 2.24, 2.24, 2.24, 2.25, 2.25, 2.26,
+               2.26, 2.26, 2.27, 2.27, 2.28, 2.28, 2.28)
+ffSSB <- approxfun(years.all, SSB.trend)
 
 ##Occupational MVPA decline function
 #assuming an annualized reduction in occupational PA of 1.2% from Ng and Popkin and initial occupational MVPA of 50 min per day
@@ -156,11 +164,8 @@ Domestic.MVPA.Function <- c(25, 24.6, 24.2, 23.9, 23.5, 23.1,
 ff.domestic.mvpa <- approxfun(years.all, Domestic.MVPA.Function)
 ff.domestic.mvpa.stable <- 25
 
-## Effect of LTPA on diabetes onset function
-LTPA.RR <- c(1, 0.99, 0.93, 0.87, 0.76, 0.74, 0.64, 0.47)
-minutes.LT <- c(0, 1, 2, 4, 10, 11, 22, 60)
-
-ff.LTPA.RR <- approxfun(minutes.LT, LTPA.RR)
+## Effect of total PA on diabetes incidence reduction (increments of 10MET h/wk) - 13% reduction in incidencerm
+PA.RR <- 13 # percentage decrease
 
 ## Total PAL calculations and assumptions
 
@@ -168,15 +173,37 @@ Total.minutes <- 1440
 Sleep.time <- 8*60
 LightPA.time <- 6*60
 SleepMets <- Sleep.time*0.95
-Sedentary.switch <- 0
 hours.LPA.increase <- 4
+mvpa.increase <- 0 #should be a number of minutes increase per day
+MVPA.switch <- 0
+Sedentary.switch <- 0
+PA.women.switch <- 0
+PA.switch <- 0
+pa.magnitude <- 1
+ob.freeze.switch <- 0
+ob.decrease.switch <- 0
+weight.loss.M <- 0
+weight.loss.W <- 0
+dpp.switch <- 0
+prevention.reduction <- 0.9275 #meta analysis effect size (0.71) and likely size of population (1/4) impacted 10.2337/dc17-2222
+obese.year.level <- NA
+predm.switch <- 0
+predm.red.size <- 1
+
+FV.intake.switch <- 0 # to model an change in FV intake independent of interventions
+FV.intake.increase <- 0
+
+tot.kcal.intake.switch <- 0 # to model an overall change in caloric intake, reduce by a proportion (multiply by number <1)
+intake.reduction <- 0.8
+aLabels.switch <- 0
 
 #healthcare intervention effect sizes
-# percentage point increase in remission from pre-diabetes, evidence derived from DPP
-preDM.effect <- .5
+# percentage point increase in remission from pre-diabetes, evidence derived from KORA study
+preDM.effect <- .7 # if one quarter of obese pre-diabetes population loses 1kg/m2 of weight per year - around 10% increase in remission
 
 # % reduction in RR of mortality by age group
-RR.hc.over55 <- .0625
-RR.hc.under55 <- .0625 # HR of 0.75 from meta-analysis of in-person self-management education doi: 10.1007/s12020-016-1168-2
+RR.hc.over55 <- 0.083
+RR.hc.under55 <- 0.083 # HR of 0.75 from meta-analysis of in-person self-management education doi: 10.1007/s12020-016-1168-2; assuming
+                      # one third of DM population implements the education and gets the benefit
 
 
